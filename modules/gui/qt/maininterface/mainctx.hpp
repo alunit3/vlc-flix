@@ -550,6 +550,11 @@ public slots:
     void emitRaise();
     void emitShow();
 
+    // flix: the Lua subtitle service found subtitles and asks whether to download them
+    void emitSubtitleOffer(const QString &json) { emit subtitleOffered(json); }
+    /** answer an offer made through subtitleOffered(): the service downloads on accept */
+    Q_INVOKABLE void answerSubtitleOffer(int fileId, bool accept);
+
     virtual void reloadPrefs();
     VLCVarChoiceModel* getExtraInterfaces();
 
@@ -559,6 +564,8 @@ protected slots:
     void onInputChanged( bool );
 
 signals:
+    /** JSON {id, uri, title, language, release, hash_match}, from flixsubs.lua */
+    void subtitleOffered(const QString &json);
     void fullscreenInterfaceToggled( bool );
     void setInterfaceVisibible(bool );
     void setInterfaceFullScreen( bool );

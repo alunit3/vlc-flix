@@ -939,6 +939,14 @@ FocusScope {
         anchors.fill: parent
     }
 
+    // flix: "Download subtitles?" from the online subtitle service
+    FlixSubOffer {
+        anchors.left: parent.left
+        anchors.leftMargin: VLCStyle.dp(48, VLCStyle.scale)
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: VLCStyle.dp(150, VLCStyle.scale)
+    }
+
     TopBar {
         id: topBar
 

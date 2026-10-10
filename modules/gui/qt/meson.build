@@ -746,6 +746,7 @@ qml_modules += {
        'player/qml/MiniPlayer.qml',
        'player/qml/PIPPlayer.qml',
        'player/qml/FlixPauseOverlay.qml',
+       'player/qml/FlixSubOffer.qml',
        'player/qml/Player.qml',
        'player/qml/PlayerControlLayout.qml',
        'player/qml/PlayerPlaylistVisibilityFSM.qml',

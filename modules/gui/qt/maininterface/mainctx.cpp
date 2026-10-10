@@ -102,6 +102,8 @@ static int IntfBossCB( vlc_object_t *p_this, const char *psz_variable,
 static int IntfRaiseMainCB( vlc_object_t *p_this, const char *psz_variable,
                            vlc_value_t old_val, vlc_value_t new_val,
                            void *param );
+static int SubtitleOfferCB( vlc_object_t *p_this, const char *psz_variable,
+                            vlc_value_t old_val, vlc_value_t new_val, void *param );
 
 const QEvent::Type MainCtx::ToolbarsNeedRebuild =
         (QEvent::Type)QEvent::registerEventType();
@@ -260,6 +262,7 @@ MainCtx::MainCtx(qt_intf_t *_p_intf)
     var_AddCallback( libvlc, "intf-toggle-fscontrol", IntfShowCB, p_intf );
     var_AddCallback( libvlc, "intf-boss", IntfBossCB, p_intf );
     var_AddCallback( libvlc, "intf-show", IntfRaiseMainCB, p_intf );
+    var_AddCallback( libvlc, "flix-sub-offer", SubtitleOfferCB, p_intf );
 
     /* Register callback for the intf-popupmenu variable */
     var_AddCallback( libvlc, "intf-popupmenu", PopupMenuCB, p_intf );
@@ -356,6 +359,7 @@ MainCtx::~MainCtx()
     libvlc_int_t* libvlc = vlc_object_instance(p_intf);
     var_DelCallback( libvlc, "intf-boss", IntfBossCB, p_intf );
     var_DelCallback( libvlc, "intf-show", IntfRaiseMainCB, p_intf );
+    var_DelCallback( libvlc, "flix-sub-offer", SubtitleOfferCB, p_intf );
     var_DelCallback( libvlc, "intf-toggle-fscontrol", IntfShowCB, p_intf );
     var_DelCallback( libvlc, "intf-popupmenu", PopupMenuCB, p_intf );
 
@@ -915,6 +919,12 @@ void MainCtx::emitShow()
     emit askShow();
 }
 
+void MainCtx::answerSubtitleOffer(int fileId, bool accept)
+{
+    const QString reply = QStringLiteral("%1:%2").arg(accept ? QStringLiteral("yes") : QStringLiteral("no")).arg(fileId);
+    var_SetString( vlc_object_instance(p_intf), "flix-sub-reply", qtu(reply) );
+}
+
 void MainCtx::emitRaise()
 {
     emit askRaise();
@@ -1007,6 +1017,17 @@ static int PopupMenuCB( vlc_object_t *, const char *,
 /*****************************************************************************
  * IntfShowCB: callback triggered by the intf-toggle-fscontrol libvlc variable.
  *****************************************************************************/
+/* flix: called from the Lua subtitle service's thread with the JSON of an offer */
+static int SubtitleOfferCB( vlc_object_t *, const char *,
+                            vlc_value_t, vlc_value_t new_val, void *param )
+{
+    qt_intf_t *p_intf = (qt_intf_t *)param;
+    if( new_val.psz_string != NULL && new_val.psz_string[0] != '\0' && p_intf->p_mi != NULL )
+        p_intf->p_mi->emitSubtitleOffer( qfu( new_val.psz_string ) );
+
+    return VLC_SUCCESS;
+}
+
 static int IntfShowCB( vlc_object_t *, const char *,
                        vlc_value_t, vlc_value_t, void *param )
 {

@@ -50,6 +50,13 @@ Item {
 
     signal activated()
 
+    // TMDB artwork when the title is known (fetched in the background), else a video frame
+    FlixMeta {
+        id: tmdb
+
+        name: root.model.title ?? ""
+    }
+
     width: cardWidth
     height: pictureHeight + barSpace
 
@@ -77,7 +84,7 @@ Item {
             id: art
 
             anchors.fill: parent
-            source: root.model.thumbnail || ""
+            source: tmdb.backdrop !== "" ? tmdb.backdrop : (root.model.thumbnail || "")
             fillMode: Image.PreserveAspectCrop
             radius: root.radius
             backgroundColor: "transparent"

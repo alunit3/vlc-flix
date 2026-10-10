@@ -18,6 +18,7 @@
 
 local api = require("flix_opensubtitles")
 local json = require("dkjson")
+local tmdb = require("flix_tmdb")
 
 local VERSION = "1.0"
 local libvlc = vlc.object.libvlc()
@@ -229,7 +230,32 @@ local function answer(reply)
     end
 end
 
+-- TMDB artwork / synopsis service: the interface queues titles in "flix-meta-request"
+local meta = nil
+local function meta_step()
+    local token = str("flix-tmdb-token")
+    if token == "" then return end
+    local language = str("flix-meta-language")
+    if not meta or meta.token ~= token or meta.language ~= (language ~= "" and language or "en-US") then
+        meta = tmdb.new(token, language, str("flix-tmdb-base-url"), str("flix-tmdb-image-url"),
+                        vlc.config.userdatadir() .. "/flix-meta")
+        meta:prepare()
+    end
+    local request = vlc.var.get(libvlc, "flix-meta-request")
+    if request and request ~= "" then
+        vlc.var.set(libvlc, "flix-meta-request", "")
+        meta:enqueue(request)
+    end
+    local key, err = meta:step()
+    if key then
+        vlc.var.set(libvlc, "flix-meta-update", key)
+    elseif err then
+        log("metadata: " .. tostring(err))
+    end
+end
+
 local function step()
+    pcall(meta_step)
     -- the interface answered a subtitle offer
     local reply = vlc.var.get(libvlc, "flix-sub-reply")
     if reply and reply ~= "" then

@@ -80,6 +80,14 @@
 
 #ifdef _WIN32
 #include <QFileInfo>
+#include <QFile>
+#include <QDir>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QDesktopServices>
+#include <QDateTime>
+#include <QRegularExpression>
 #endif
 
 #include <vlc_interface.h>
@@ -104,6 +112,8 @@ static int IntfRaiseMainCB( vlc_object_t *p_this, const char *psz_variable,
                            void *param );
 static int SubtitleOfferCB( vlc_object_t *p_this, const char *psz_variable,
                             vlc_value_t old_val, vlc_value_t new_val, void *param );
+static int MetaUpdateCB( vlc_object_t *p_this, const char *psz_variable,
+                         vlc_value_t old_val, vlc_value_t new_val, void *param );
 
 const QEvent::Type MainCtx::ToolbarsNeedRebuild =
         (QEvent::Type)QEvent::registerEventType();
@@ -263,6 +273,7 @@ MainCtx::MainCtx(qt_intf_t *_p_intf)
     var_AddCallback( libvlc, "intf-boss", IntfBossCB, p_intf );
     var_AddCallback( libvlc, "intf-show", IntfRaiseMainCB, p_intf );
     var_AddCallback( libvlc, "flix-sub-offer", SubtitleOfferCB, p_intf );
+    var_AddCallback( libvlc, "flix-meta-update", MetaUpdateCB, p_intf );
 
     /* Register callback for the intf-popupmenu variable */
     var_AddCallback( libvlc, "intf-popupmenu", PopupMenuCB, p_intf );
@@ -360,6 +371,7 @@ MainCtx::~MainCtx()
     var_DelCallback( libvlc, "intf-boss", IntfBossCB, p_intf );
     var_DelCallback( libvlc, "intf-show", IntfRaiseMainCB, p_intf );
     var_DelCallback( libvlc, "flix-sub-offer", SubtitleOfferCB, p_intf );
+    var_DelCallback( libvlc, "flix-meta-update", MetaUpdateCB, p_intf );
     var_DelCallback( libvlc, "intf-toggle-fscontrol", IntfShowCB, p_intf );
     var_DelCallback( libvlc, "intf-popupmenu", PopupMenuCB, p_intf );
 
@@ -697,6 +709,174 @@ QVariantMap MainCtx::releaseInfo(const QString &name) const
     return map;
 }
 
+static QString metaDirectory()
+{
+    char *dir = config_GetUserDir( VLC_USERDATA_DIR );
+    if( dir == nullptr )
+        return QString();
+    const QString path = QDir::fromNativeSeparators( qfu( dir ) ) + QStringLiteral("/flix-meta");
+    free( dir );
+    return path;
+}
+
+static QString metaFileUrl( const QString &directory, const QString &relative )
+{
+    if( relative.isEmpty() || relative.contains( QStringLiteral("..") ) )
+        return QString();
+    const QString path = directory + QLatin1Char('/') + relative;
+    return QFile::exists( path ) ? QUrl::fromLocalFile( path ).toString() : QString();
+}
+
+static QVariantMap metaRecordToMap( const QJsonObject &o, const QString &directory )
+{
+    QVariantMap m;
+    m.insert( QStringLiteral("found"), o.value( QStringLiteral("found") ).toBool() );
+    m.insert( QStringLiteral("title"), o.value( QStringLiteral("title") ).toString() );
+    m.insert( QStringLiteral("year"), o.value( QStringLiteral("year") ).toInt() );
+    m.insert( QStringLiteral("overview"), o.value( QStringLiteral("overview") ).toString() );
+    m.insert( QStringLiteral("tagline"), o.value( QStringLiteral("tagline") ).toString() );
+    m.insert( QStringLiteral("runtime"), o.value( QStringLiteral("runtime") ).toInt() );
+    m.insert( QStringLiteral("rating"), o.value( QStringLiteral("rating") ).toDouble() );
+    m.insert( QStringLiteral("imdbId"), o.value( QStringLiteral("imdb_id") ).toString() );
+    m.insert( QStringLiteral("mediaType"), o.value( QStringLiteral("media_type") ).toString() );
+    m.insert( QStringLiteral("genres"), o.value( QStringLiteral("genres") ).toArray().toVariantList() );
+    m.insert( QStringLiteral("poster"), metaFileUrl( directory, o.value( QStringLiteral("poster") ).toString() ) );
+    m.insert( QStringLiteral("backdrop"), metaFileUrl( directory, o.value( QStringLiteral("backdrop") ).toString() ) );
+    return m;
+}
+
+bool MainCtx::metaEnabled() const
+{
+    char *token = var_InheritString( p_intf, "flix-tmdb-token" );
+    const bool enabled = token != nullptr && token[0] != '\0';
+    free( token );
+    return enabled;
+}
+
+QVariantMap MainCtx::meta(const QString &name)
+{
+    if( name.isEmpty() || !metaEnabled() )
+        return {};
+
+    const QVariantMap info = releaseInfo( name );
+    const QString title = info.value( QStringLiteral("title") ).toString().trimmed();
+    if( title.isEmpty() )
+        return {};
+    const int year = info.value( QStringLiteral("year") ).toInt();
+    const bool tv = info.value( QStringLiteral("isEpisode") ).toBool();
+
+    char *lang = var_InheritString( p_intf, "flix-meta-language" );
+    const QString language = lang && lang[0] ? qfu( lang ) : QStringLiteral("en-US");
+    free( lang );
+
+    // this key names the cache file: the Lua side only sees what we send it
+    QString slug;
+    for( const QChar c : title.toLower() )
+        slug += ( c.unicode() < 128 && c.isLetterOrNumber() ) ? c : QChar('-');
+    slug.replace( QRegularExpression( QStringLiteral("-+") ), QStringLiteral("-") );
+    slug = slug.left( 80 );
+    const QString key = QStringLiteral("%1%2-%3-%4").arg( tv ? QStringLiteral("tv-") : QString(),
+        slug ).arg( year ).arg( language.toLower() );
+
+    const QString directory = metaDirectory();
+    QFile file( directory + QStringLiteral("/movie/") + key + QStringLiteral(".json") );
+    if( file.open( QIODevice::ReadOnly ) )
+    {
+        const QJsonObject o = QJsonDocument::fromJson( file.readAll() ).object();
+        file.close();
+        const qint64 age = QDateTime::currentSecsSinceEpoch() - qint64( o.value( QStringLiteral("fetched") ).toDouble() );
+        const bool stale = o.value( QStringLiteral("found") ).toBool() ? age > 30 * 86400
+                                                                          : age > 7 * 86400;
+        if( !o.isEmpty() && !stale )
+            return metaRecordToMap( o, directory );
+    }
+
+    // not cached: ask the service (batched)
+    if( !m_metaPending.contains( key ) )
+    {
+        QVariantMap req;
+        req.insert( QStringLiteral("key"), key );
+        req.insert( QStringLiteral("title"), title );
+        req.insert( QStringLiteral("year"), year );
+        req.insert( QStringLiteral("season"), info.value( QStringLiteral("season") ) );
+        req.insert( QStringLiteral("episode"), info.value( QStringLiteral("episode") ) );
+        m_metaPending.insert( key, req );
+        if( !m_metaTimer )
+        {
+            m_metaTimer = new QTimer( this );
+            m_metaTimer->setSingleShot( true );
+            connect( m_metaTimer, &QTimer::timeout, this, &MainCtx::flushMetaRequests );
+        }
+        m_metaTimer->start( 300 );
+    }
+    return {};
+}
+
+void MainCtx::flushMetaRequests()
+{
+    libvlc_int_t *libvlc = vlc_object_instance( p_intf );
+    QJsonArray list;
+
+    // keep what the service has not picked up yet
+    char *previous = var_GetString( libvlc, "flix-meta-request" );
+    if( previous != nullptr && previous[0] != '\0' )
+        list = QJsonDocument::fromJson( QByteArray( previous ) ).array();
+    free( previous );
+
+    for( const QVariant &req : std::as_const( m_metaPending ) )
+        list.append( QJsonObject::fromVariantMap( req.toMap() ) );
+    m_metaPending.clear();
+    var_SetString( libvlc, "flix-meta-request", QJsonDocument( list ).toJson( QJsonDocument::Compact ).constData() );
+}
+
+QVariantList MainCtx::topTen() const
+{
+    QVariantList result;
+    const QString directory = metaDirectory();
+    QFile file( directory + QStringLiteral("/top10.json") );
+    if( !file.open( QIODevice::ReadOnly ) )
+        return result;
+    const QJsonArray items = QJsonDocument::fromJson( file.readAll() ).object().value( QStringLiteral("items") ).toArray();
+    for( const QJsonValue &v : items )
+    {
+        QVariantMap m = metaRecordToMap( v.toObject(), directory );
+        m.insert( QStringLiteral("rank"), v.toObject().value( QStringLiteral("rank") ).toInt() );
+        if( !m.value( QStringLiteral("poster") ).toString().isEmpty() )
+            result.append( m );
+    }
+    return result;
+}
+
+static bool validImdbId( const QString &id )
+{
+    return QRegularExpression( QStringLiteral("^tt\\d{5,10}$") ).match( id ).hasMatch();
+}
+
+QUrl MainCtx::imdbUrl(const QString &imdbId) const
+{
+    return validImdbId( imdbId ) ? QUrl( QStringLiteral("https://www.imdb.com/title/") + imdbId + QLatin1Char('/') )
+                                 : QUrl();
+}
+
+QUrl MainCtx::topTenUrl(const QString &imdbId) const
+{
+    if( !validImdbId( imdbId ) )
+        return QUrl();
+    char *target = var_InheritString( p_intf, "flix-top10-target" );
+    const bool imdb = target && qstrcmp( target, "imdb" ) == 0;
+    free( target );
+    if( imdb )
+        return imdbUrl( imdbId );
+    return QUrl( QStringLiteral("https://heartivelovestv.pages.dev/torrents/?id=") + imdbId );
+}
+
+bool MainCtx::openExternal(const QUrl &url) const
+{
+    if( !url.isValid() || ( url.scheme() != QLatin1String("https") && url.scheme() != QLatin1String("http") ) )
+        return false;
+    return QDesktopServices::openUrl( url );
+}
+
 QString MainCtx::cleanTitle(const QString &name) const
 {
     if (name.isEmpty())
@@ -1024,6 +1204,17 @@ static int SubtitleOfferCB( vlc_object_t *, const char *,
     qt_intf_t *p_intf = (qt_intf_t *)param;
     if( new_val.psz_string != NULL && new_val.psz_string[0] != '\0' && p_intf->p_mi != NULL )
         p_intf->p_mi->emitSubtitleOffer( qfu( new_val.psz_string ) );
+
+    return VLC_SUCCESS;
+}
+
+/* flix: called from the Lua service's thread with the key of a new cache entry */
+static int MetaUpdateCB( vlc_object_t *, const char *,
+                         vlc_value_t, vlc_value_t new_val, void *param )
+{
+    qt_intf_t *p_intf = (qt_intf_t *)param;
+    if( new_val.psz_string != NULL && new_val.psz_string[0] != '\0' && p_intf->p_mi != NULL )
+        p_intf->p_mi->emitMetaUpdate( qfu( new_val.psz_string ) );
 
     return VLC_SUCCESS;
 }

@@ -972,7 +972,7 @@ FocusScope {
                   resumeVisible)
 
         focus: true
-        title: MainCtx.cleanTitle(Player.title)
+        title: MainCtx.cleanTitle(Player.title || Player.name)
 
         pinControls: MainCtx.pinVideoControls
 

@@ -67,7 +67,7 @@ Install-Built (Join-Path $run "libvlccore.dll.new")   (Join-Path $run "libvlccor
 Install-Built (Join-Path $run "liblua_plugin.dll.new") (Join-Path $run ("plugins" + [IO.Path]::DirectorySeparatorChar + "lua" + [IO.Path]::DirectorySeparatorChar + "liblua_plugin.dll"))
 
 # Lua scripts are loaded as plain source in the run tree
-foreach ($rel in @("intf/flixsubs.lua", "modules/flix_opensubtitles.lua")) {
+foreach ($rel in @("intf/flixsubs.lua", "modules/flix_opensubtitles.lua", "modules/flix_tmdb.lua", "extensions/FlixSubs.lua")) {
     $to = Join-Path $run ("lua/" + $rel)
     New-Item -ItemType Directory -Force (Split-Path $to) | Out-Null
     Copy-Item (Join-Path $src ("share/lua/" + $rel)) $to -Force

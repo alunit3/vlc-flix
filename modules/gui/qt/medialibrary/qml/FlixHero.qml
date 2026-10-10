@@ -29,6 +29,9 @@ Item {
     property var model
     property real sideMargin: VLCStyle.dp(48, VLCStyle.scale)
 
+    // the user pressed "More Info" on a slide: {id, title, duration, thumbnail}
+    signal infoRequested(var item)
+
     implicitHeight: VLCStyle.dp(440, VLCStyle.scale)
     visible: view.count > 0
 
@@ -52,7 +55,11 @@ Item {
 
             readonly property bool resuming: (model.progress ?? 0) > 0
 
-            property bool showInfo: false
+            FlixMeta {
+                id: tmdb
+
+                name: slide.model.title ?? ""
+            }
 
             // year / episode / resolution guessed from the file name
             readonly property var info: MainCtx.releaseInfo(model.title ?? "")
@@ -91,7 +98,8 @@ Item {
                 id: art
 
                 anchors.fill: parent
-                source: slide.model.thumbnail || ""
+                // TMDB backdrop when known, otherwise a frame of the video
+                source: tmdb.backdrop !== "" ? tmdb.backdrop : (slide.model.thumbnail || "")
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 visible: status === Image.Ready
@@ -104,6 +112,19 @@ Item {
                     orientation: Gradient.Horizontal
                     GradientStop { position: 0.0; color: Qt.rgba(0.08, 0.08, 0.08, 0.95) }
                     GradientStop { position: 0.55; color: Qt.rgba(0.08, 0.08, 0.08, 0.35) }
+                    GradientStop { position: 1.0; color: "transparent" }
+                }
+            }
+
+            // top scrim: the black top bar melts into the picture
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: VLCStyle.dp(130, VLCStyle.scale)
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0.92) }
+                    GradientStop { position: 0.6; color: Qt.rgba(0, 0, 0, 0.35) }
                     GradientStop { position: 1.0; color: "transparent" }
                 }
             }
@@ -160,10 +181,22 @@ Item {
                 }
 
                 Text {
-                    text: slide.meta
+                    text: slide.meta + (tmdb.genres.length > 0 ? "  \u2022  " + tmdb.genres.slice(0, 2).join(", ") : "")
                     color: "#E5E5E5"
                     font.pixelSize: VLCStyle.dp(15, VLCStyle.scale)
                     font.weight: Font.DemiBold
+                }
+
+                Text {
+                    visible: tmdb.overview !== ""
+                    width: parent.width
+                    text: tmdb.overview
+                    color: "#E5E5E5"
+                    font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
+                    lineHeight: 1.1
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 3
+                    elide: Text.ElideRight
                 }
 
                 Row {
@@ -244,24 +277,14 @@ Item {
                     HoverHandler { id: infoHover; cursorShape: Qt.PointingHandCursor }
 
                     TapHandler {
-                        onTapped: slide.showInfo = !slide.showInfo
+                        onTapped: root.infoRequested({
+                            id: slide.model.id,
+                            title: slide.model.title,
+                            duration: slide.model.duration,
+                            thumbnail: slide.model.thumbnail
+                        })
                     }
                 }
-                }
-
-                // file details, shown by "More Info"
-                Text {
-                    visible: slide.showInfo
-                    width: parent.width
-                    text: qsTr("File: %1").arg(slide.model.title ?? "")
-                          + (slide.info.recognized ? "\n" + qsTr("Detected: %1").arg(slide.info.title
-                                                                                      + (slide.info.year > 0 ? " (" + slide.info.year + ")" : ""))
-                                                   : "")
-                    color: "#B3B3B3"
-                    font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
-                    wrapMode: Text.WrapAnywhere
-                    maximumLineCount: 3
-                    elide: Text.ElideRight
                 }
             }
         }

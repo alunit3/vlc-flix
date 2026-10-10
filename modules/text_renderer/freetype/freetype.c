@@ -157,7 +157,7 @@ vlc_module_begin ()
         change_integer_list( pi_color_values, ppsz_color_descriptions )
         change_safe()
 
-    add_bool( "freetype-bold", false, BOLD_TEXT, NULL )
+    add_bool( "freetype-bold", true, BOLD_TEXT, NULL )  /* flix: bold like streaming subtitles */
         change_safe()
 
     add_integer_with_range( "freetype-background-opacity", 0, 0, 255,
@@ -173,12 +173,12 @@ vlc_module_begin ()
     add_rgb("freetype-outline-color", 0x00000000, OUTLINE_COLOR_TEXT, NULL)
         change_integer_list( pi_color_values, ppsz_color_descriptions )
         change_safe()
-    add_integer_with_range( "freetype-outline-thickness", 4, 0, 50, OUTLINE_THICKNESS_TEXT,
+    add_integer_with_range( "freetype-outline-thickness", 3, 0, 50, OUTLINE_THICKNESS_TEXT,
              NULL )
         change_integer_list( pi_outline_thickness, ppsz_outline_thickness )
         change_safe()
 
-    add_integer_with_range( "freetype-shadow-opacity", 128, 0, 255,
+    add_integer_with_range( "freetype-shadow-opacity", 190, 0, 255,
                             SHADOW_OPACITY_TEXT, NULL )
         change_safe()
     add_rgb("freetype-shadow-color", 0x00000000, SHADOW_COLOR_TEXT, NULL)
@@ -187,7 +187,7 @@ vlc_module_begin ()
     add_float_with_range( "freetype-shadow-angle", -45, -360, 360,
                           SHADOW_ANGLE_TEXT, NULL )
         change_safe()
-    add_float_with_range( "freetype-shadow-distance", 0.06, 0.0, 1.0,
+    add_float_with_range( "freetype-shadow-distance", 0.08, 0.0, 1.0,
                           SHADOW_DISTANCE_TEXT, NULL )
         change_safe()
 

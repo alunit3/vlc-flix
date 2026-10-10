@@ -31,7 +31,7 @@ Item {
     // upper bound for the width, set by the layout so the title never overlaps other controls
     property real maxWidth: VLCStyle.dp(560, VLCStyle.scale)
 
-    readonly property string _display: MainCtx.cleanTitle(Player.title)
+    readonly property string _display: MainCtx.cleanTitle(Player.title || Player.name)
     readonly property var _episode: _display.match(/^(.*) - S(\d+)E(\d+)$/)
 
     // A label's implicitWidth is the width of its full text and does not depend on its

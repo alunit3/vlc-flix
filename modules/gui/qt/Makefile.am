@@ -1092,7 +1092,10 @@ libqml_module_medialibrary_a_QML = \
 	medialibrary/qml/FlixCard.qml \
 	medialibrary/qml/FlixHero.qml \
 	medialibrary/qml/FlixHomePage.qml \
+	medialibrary/qml/FlixMeta.qml \
+	medialibrary/qml/FlixMoreInfo.qml \
 	medialibrary/qml/FlixRow.qml \
+	medialibrary/qml/FlixTopTen.qml \
 	medialibrary/qml/HomeDisplay.qml \
 	medialibrary/qml/HomePage.qml \
 	medialibrary/qml/MediaView.qml \

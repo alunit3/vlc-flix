@@ -39,7 +39,7 @@ Item {
             idleTimer.restart()
     }
 
-    readonly property string display: MainCtx.cleanTitle(Player.title)
+    readonly property string display: MainCtx.cleanTitle(Player.title || Player.name)
     readonly property var episode: display.match(/^(.*) - S(\d+)E(\d+)$/)
 
     visible: opacity > 0
@@ -49,12 +49,32 @@ Item {
         NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
     }
 
+    // TMDB synopsis of what is playing (asked for as soon as the video is paused)
+    property var meta: ({})
+    readonly property string overview: meta.overview ?? ""
+
+    function refreshMeta() {
+        const name = Player.title || Player.name
+        meta = name !== "" ? MainCtx.meta(name) : ({})
+    }
+
+    Connections {
+        target: MainCtx
+
+        function onMetaUpdated(key) {
+            if (root.paused && !root.overview)
+                root.refreshMeta()
+        }
+    }
+
     onPausedChanged: {
         armed = false
-        if (paused)
+        if (paused) {
+            refreshMeta()
             idleTimer.restart()
-        else
+        } else {
             idleTimer.stop()
+        }
     }
 
     // wait a few seconds so pausing for a moment does not flash the screen
@@ -91,6 +111,19 @@ Item {
             font.weight: Font.Bold
             wrapMode: Text.WordWrap
             maximumLineCount: 2
+            elide: Text.ElideRight
+        }
+
+        // synopsis from TMDB, directly under the title
+        Text {
+            visible: root.overview !== ""
+            width: Math.min(parent.width, VLCStyle.dp(640, VLCStyle.scale))
+            text: root.overview
+            color: "#D2D2D2"
+            font.pixelSize: VLCStyle.dp(18, VLCStyle.scale)
+            lineHeight: 1.15
+            wrapMode: Text.WordWrap
+            maximumLineCount: 5
             elide: Text.ElideRight
         }
 

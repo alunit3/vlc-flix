@@ -215,7 +215,7 @@ void ExtensionsManager::openVLsub()
     ARRAY_FOREACH( p_ext, p_extensions_manager->extensions )
     {
         const char *extensionName = p_ext->psz_shortdescription ? p_ext->psz_shortdescription: p_ext->psz_title;
-        if ( !extensionName || strcmp( extensionName, "VLsub" ) )
+        if ( !extensionName || strcmp( extensionName, "FlixSubs" ) )
             continue;
 
         vlc_mutex_unlock( &p_extensions_manager->lock );

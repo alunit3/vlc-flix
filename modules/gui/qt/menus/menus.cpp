@@ -438,6 +438,9 @@ void VLCMenuBar::SubtitleMenu( qt_intf_t *p_intf, QMenu *current, bool b_popup )
                 &DialogsProvider::loadSubtitlesFile);
         current->addMenu(new CheckableListMenu(qtr( "Sub &Track" ), THEMIM->getSubtitleTracks(), QActionGroup::ExclusionPolicy::ExclusiveOptional, current));
         current->addSeparator();
+        /* flix: manual search in OpenSubtitles (share/lua/extensions/FlixSubs.lua) */
+        current->addAction( qtr( "&Find Subtitles Online..." ), current, [p_intf]() { THEMIM->openVLsub(); } );
+        current->addSeparator();
     }
 }
 

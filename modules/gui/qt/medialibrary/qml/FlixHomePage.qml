@@ -50,6 +50,13 @@ Widgets.PageExt {
 
     readonly property var _rows: [continueRow, recentRow, favoritesRow, allRow]
 
+    // flix: "More Info" details of the billboard title
+    FlixMoreInfo {
+        id: moreInfo
+
+        anchors.fill: parent
+    }
+
     function _scrollTo(y) {
         flickAnim.stop()
         flickAnim.to = Math.max(0, Math.min(Math.max(0, flick.contentHeight - flick.height), y))
@@ -136,6 +143,8 @@ Widgets.PageExt {
 
                 // prefer something the user already started
                 model: continueRow.count > 0 ? continueRow.model : recentRow.model
+
+                onInfoRequested: (item) => moreInfo.open(item)
             }
 
             FlixRow {
@@ -156,6 +165,13 @@ Widgets.PageExt {
                 onSeeAllClicked: root.seeAllButtonClicked("continueWatching", Qt.MouseFocusReason)
                 onMoveUp: root._step(continueRow, -1)
                 onMoveDown: root._step(continueRow, 1)
+            }
+
+            FlixTopTen {
+                id: topTen
+
+                width: parent.width
+                sideMargin: root.sideMargin
             }
 
             FlixRow {

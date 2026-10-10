@@ -418,6 +418,20 @@ public:
     // flix: {recognized, title, year, season, episode, resolution, isEpisode} guessed from a file name
     Q_INVOKABLE QVariantMap releaseInfo(const QString &name) const;
 
+    // flix: TMDB information for a title or file name, read from the cache that flixsubs.lua fills.
+    // Empty until it is known (the title is queued; metaUpdated() follows); "found" is false for
+    // titles TMDB does not know. Image fields are file:// URLs.
+    Q_INVOKABLE QVariantMap meta(const QString &name);
+    // flix: this week's trending movies [{rank, title, year, overview, imdbId, poster, backdrop}]
+    Q_INVOKABLE QVariantList topTen() const;
+    // flix: true when a TMDB token is configured
+    Q_INVOKABLE bool metaEnabled() const;
+    // flix: page for an IMDb id: the torrents site or IMDb, per the flix-top10-target option
+    Q_INVOKABLE QUrl topTenUrl(const QString &imdbId) const;
+    Q_INVOKABLE QUrl imdbUrl(const QString &imdbId) const;
+    // flix: open an http(s) page in the browser
+    Q_INVOKABLE bool openExternal(const QUrl &url) const;
+
     double artistAlbumsWidth() const;
     void setArtistAlbumsWidth(double newArtistAlbumsWidth);
 
@@ -518,6 +532,11 @@ protected:
 
     ThreadRunner* m_threadRunner = nullptr;
 
+    // flix: metadata requests waiting to be handed to the Lua service
+    QVariantMap m_metaPending;
+    QTimer *m_metaTimer = nullptr;
+    void flushMetaRequests();
+
 public slots:
     void toggleToolbarMenu();
     void toggleInterfaceFullScreen();
@@ -552,6 +571,7 @@ public slots:
 
     // flix: the Lua subtitle service found subtitles and asks whether to download them
     void emitSubtitleOffer(const QString &json) { emit subtitleOffered(json); }
+    void emitMetaUpdate(const QString &key) { emit metaUpdated(key); }
     /** answer an offer made through subtitleOffered(): the service downloads on accept */
     Q_INVOKABLE void answerSubtitleOffer(int fileId, bool accept);
 
@@ -566,6 +586,8 @@ protected slots:
 signals:
     /** JSON {id, uri, title, language, release, hash_match}, from flixsubs.lua */
     void subtitleOffered(const QString &json);
+    /** a cache entry ("top10" or a title key) was written by flixsubs.lua */
+    void metaUpdated(const QString &key);
     void fullscreenInterfaceToggled( bool );
     void setInterfaceVisibible(bool );
     void setInterfaceFullScreen( bool );

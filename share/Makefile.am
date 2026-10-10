@@ -3,7 +3,7 @@ MOSTLYCLEANFILES =
 EXTRA_DIST =
 
 LUA_MODULES = \
-	lua/extensions/VLSub.lua \
+	lua/extensions/FlixSubs.lua \
 	lua/intf/cli.lua \
 	lua/intf/dummy.lua \
 	lua/intf/dumpmeta.lua \
@@ -21,6 +21,7 @@ LUA_MODULES = \
 	lua/modules/common.lua \
 	lua/modules/dkjson.lua \
 	lua/modules/flix_opensubtitles.lua \
+	lua/modules/flix_tmdb.lua \
 	lua/modules/sandbox.lua \
 	lua/modules/simplexml.lua \
 	lua/playlist/anevia_streams.lua \

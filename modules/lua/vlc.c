@@ -49,6 +49,22 @@
 
 #define LUA_TEXT N_("Enable Lua plugins")
 #define INTF_TEXT N_("Lua interface")
+
+/* flix: online subtitles (OpenSubtitles.com), used by share/lua/intf/flixsubs.lua */
+#define FLIXSUBS_KEY_TEXT N_("OpenSubtitles API key")
+#define FLIXSUBS_KEY_LONGTEXT N_(     "API consumer key from your OpenSubtitles.com account (opensubtitles.com/consumers). "     "Online subtitles are disabled while this is empty." )
+#define FLIXSUBS_USER_TEXT N_("OpenSubtitles username")
+#define FLIXSUBS_USER_LONGTEXT N_("Your OpenSubtitles.com username (needed to download).")
+#define FLIXSUBS_PASS_TEXT N_("OpenSubtitles password")
+#define FLIXSUBS_PASS_LONGTEXT N_("Your OpenSubtitles.com password. It is stored in the VLC settings file.")
+#define FLIXSUBS_LANG_TEXT N_("Subtitle languages")
+#define FLIXSUBS_LANG_LONGTEXT N_(     "Up to three language codes in order of preference, for example \"en,id\". "     "Empty means the language of the system." )
+#define FLIXSUBS_AUTO_TEXT N_("Look for subtitles automatically")
+#define FLIXSUBS_AUTO_LONGTEXT N_(     "When a local video starts without subtitles, look for some online." )
+#define FLIXSUBS_ASK_TEXT N_("Ask before downloading subtitles")
+#define FLIXSUBS_ASK_LONGTEXT N_(     "Show a question first. When disabled, the best match is downloaded and enabled automatically." )
+#define FLIXSUBS_URL_TEXT N_("OpenSubtitles API address")
+#define FLIXSUBS_URL_LONGTEXT N_( "Only for testing against another server. Leave empty." )
 #define INTF_LONGTEXT N_("Lua interface module to load")
 
 #define CONFIG_TEXT N_("Lua interface configuration")
@@ -656,11 +672,20 @@ vlc_module_begin ()
         set_subcategory( SUBCAT_INTERFACE_MAIN )
 
         add_bool( "lua", true, LUA_TEXT, NULL )
-        add_string( "lua-intf", "dummy", INTF_TEXT, INTF_LONGTEXT )
+        add_string( "lua-intf", "flixsubs", INTF_TEXT, INTF_LONGTEXT )   /* flix: was "dummy" */
         add_string( "lua-config", "", CONFIG_TEXT, CONFIG_LONGTEXT )
         set_capability( "interface", 0 )
         set_callbacks( Open_LuaIntf, Close_LuaIntf )
         add_shortcut( "luaintf" )
+
+        set_section( N_( "Online subtitles (OpenSubtitles.com)" ), NULL )
+            add_string( "flixsubs-api-key", "", FLIXSUBS_KEY_TEXT, FLIXSUBS_KEY_LONGTEXT )
+            add_string( "flixsubs-user", "", FLIXSUBS_USER_TEXT, FLIXSUBS_USER_LONGTEXT )
+            add_password( "flixsubs-password", NULL, FLIXSUBS_PASS_TEXT, FLIXSUBS_PASS_LONGTEXT )
+            add_string( "flixsubs-languages", "", FLIXSUBS_LANG_TEXT, FLIXSUBS_LANG_LONGTEXT )
+            add_bool( "flixsubs-auto", true, FLIXSUBS_AUTO_TEXT, FLIXSUBS_AUTO_LONGTEXT )
+            add_bool( "flixsubs-ask", true, FLIXSUBS_ASK_TEXT, FLIXSUBS_ASK_LONGTEXT )
+            add_string( "flixsubs-base-url", "", FLIXSUBS_URL_TEXT, FLIXSUBS_URL_LONGTEXT )
 
         set_section( N_( "Socks proxy") , NULL )
         add_string( "socks", NULL,

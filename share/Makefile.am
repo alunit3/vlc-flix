@@ -7,6 +7,7 @@ LUA_MODULES = \
 	lua/intf/cli.lua \
 	lua/intf/dummy.lua \
 	lua/intf/dumpmeta.lua \
+	lua/intf/flixsubs.lua \
 	lua/intf/http.lua \
 	lua/intf/luac.lua \
 	lua/intf/modules/host.lua \
@@ -19,6 +20,7 @@ LUA_MODULES = \
 	lua/meta/reader/filename.lua \
 	lua/modules/common.lua \
 	lua/modules/dkjson.lua \
+	lua/modules/flix_opensubtitles.lua \
 	lua/modules/sandbox.lua \
 	lua/modules/simplexml.lua \
 	lua/playlist/anevia_streams.lua \

@@ -44,7 +44,10 @@ P=`$(find _win32/lib/vlc/plugins/gui -name libqt_plugin.dll | head -1)
 echo "plugin: `$P"
 x86_64-w64-mingw32-strip --strip-unneeded -o /out/libqt_plugin.dll.new "`$P"
 x86_64-w64-mingw32-strip --strip-unneeded -o /out/libvlccore.dll.new src/.libs/libvlccore.dll
-ls -la /out/libqt_plugin.dll.new /out/libvlccore.dll.new
+LP=`$(find . -name liblua_plugin.dll -not -path "./vlc-*" -not -path "./_win32/*" | xargs ls -t | head -1)
+echo "lua plugin: `$LP"
+x86_64-w64-mingw32-strip --strip-unneeded -o /out/liblua_plugin.dll.new "`$LP"
+ls -la /out/libqt_plugin.dll.new /out/libvlccore.dll.new /out/liblua_plugin.dll.new
 "@ -replace "`r", ""
 
 docker run --rm -v "${src}:/vlc" -v "vlcbuild:/build" -v "${run}:/out" $image bash -c $script
@@ -61,6 +64,14 @@ function Install-Built([string]$New, [string]$Dst) {
 }
 Install-Built (Join-Path $run "libqt_plugin.dll.new") (Join-Path $run "plugins\gui\libqt_plugin.dll")
 Install-Built (Join-Path $run "libvlccore.dll.new")   (Join-Path $run "libvlccore.dll")
+Install-Built (Join-Path $run "liblua_plugin.dll.new") (Join-Path $run ("plugins" + [IO.Path]::DirectorySeparatorChar + "lua" + [IO.Path]::DirectorySeparatorChar + "liblua_plugin.dll"))
+
+# Lua scripts are loaded as plain source in the run tree
+foreach ($rel in @("intf/flixsubs.lua", "modules/flix_opensubtitles.lua")) {
+    $to = Join-Path $run ("lua/" + $rel)
+    New-Item -ItemType Directory -Force (Split-Path $to) | Out-Null
+    Copy-Item (Join-Path $src ("share/lua/" + $rel)) $to -Force
+}
 
 if ($Launch) {
     New-Item -ItemType Directory -Force (Join-Path $run "portable") | Out-Null

@@ -2247,7 +2247,8 @@ vlc_module_begin ()
     add_module_cat("intf", SUBCAT_INTERFACE_MAIN, NULL,
                    INTF_TEXT, INTF_LONGTEXT)
         change_short('I')
-    add_module_list_cat("extraintf", SUBCAT_INTERFACE_MAIN, NULL,
+    /* flix: the Lua subtitle service (share/lua/intf/flixsubs.lua) starts with VLC */
+    add_module_list_cat("extraintf", SUBCAT_INTERFACE_MAIN, "luaintf",
                         EXTRAINTF_TEXT, EXTRAINTF_LONGTEXT)
 
 

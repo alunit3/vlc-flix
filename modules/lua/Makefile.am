@@ -20,6 +20,7 @@ liblua_plugin_la_SOURCES = \
 	lua/libs/equalizer.c \
 	lua/libs/gettext.c \
 	lua/libs/dialog.c \
+	lua/libs/http.c \
 	lua/libs/httpd.c \
 	lua/libs/input.c lua/libs/input.h \
 	lua/libs/messages.c \
@@ -48,6 +49,8 @@ liblua_plugin_la_SOURCES += lua/libs/win.c
 endif
 liblua_plugin_la_CFLAGS = $(AM_CFLAGS) $(LUA_CFLAGS) -I$(srcdir)/lua
 liblua_plugin_la_LIBADD = $(LUA_LIBS) $(SOCKET_LIBS) $(LIBDL) $(LIBM)
+# flix: lua/libs/http.c undoes a gzip Content-Encoding
+liblua_plugin_la_LIBADD += -lz
 if BUILD_LUA
 lua_PLUGINS += liblua_plugin.la
 endif

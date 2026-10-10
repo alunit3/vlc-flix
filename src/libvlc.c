@@ -324,6 +324,11 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
     /* Create a variable for showing the main interface */
     var_Create(p_libvlc, "intf-show", VLC_VAR_VOID);
 
+    /* flix: the Lua subtitle service (flixsubs.lua) publishes a JSON subtitle offer
+     * in "flix-sub-offer" and the interface answers in "flix-sub-reply" */
+    var_Create(p_libvlc, "flix-sub-offer", VLC_VAR_STRING);
+    var_Create(p_libvlc, "flix-sub-reply", VLC_VAR_STRING);
+
     return VLC_SUCCESS;
 
 error:

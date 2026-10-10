@@ -28,6 +28,7 @@
 void luaopen_config( lua_State * );
 void luaopen_dialog( lua_State *, void * );
 void luaopen_httpd( lua_State * );
+void luaopen_http( lua_State * );   /* flix: vlc.http.get / vlc.http.post */
 void luaopen_input( lua_State * );
 void luaopen_msg( lua_State * );
 void luaopen_misc( lua_State * );

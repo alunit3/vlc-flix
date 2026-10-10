@@ -39,6 +39,7 @@
 #include <vlc_plugin.h>
 #include <vlc_meta.h>
 #include <vlc_charset.h>
+#include <vlc_strings.h>
 
 #include "../vlc.h"
 #include "../libs.h"
@@ -240,7 +241,40 @@ static int vlclua_from_charset( lua_State *L )
 /*****************************************************************************
  *
  *****************************************************************************/
+/*****************************************************************************
+ * vlc.strings.release_info( name )
+ * Guess title / year / season / episode / resolution from a release or torrent
+ * style file name. Returns a table { title, year, season, episode, resolution,
+ * recognized }; year, season and episode are 0 when unknown, resolution is ""
+ * and recognized is false for a plain human title.
+ *****************************************************************************/
+static int vlclua_release_info( lua_State *L )
+{
+    const char *psz_name = luaL_checkstring( L, 1 );
+    struct vlc_release_info info;
+
+    int i_ret = vlc_release_name_parse( psz_name, &info );
+
+    lua_createtable( L, 0, 6 );
+    lua_pushstring( L, info.title != NULL ? info.title : psz_name );
+    lua_setfield( L, -2, "title" );
+    lua_pushinteger( L, info.year );
+    lua_setfield( L, -2, "year" );
+    lua_pushinteger( L, info.season );
+    lua_setfield( L, -2, "season" );
+    lua_pushinteger( L, info.episode );
+    lua_setfield( L, -2, "episode" );
+    lua_pushstring( L, info.resolution );
+    lua_setfield( L, -2, "resolution" );
+    lua_pushboolean( L, i_ret == 0 );
+    lua_setfield( L, -2, "recognized" );
+
+    vlc_release_info_clean( &info );
+    return 1;
+}
+
 static const luaL_Reg vlclua_strings_reg[] = {
+    { "release_info", vlclua_release_info },
     { "decode_uri", vlclua_decode_uri },
     { "encode_uri_component", vlclua_encode_uri_component },
     { "make_uri", vlclua_make_uri },

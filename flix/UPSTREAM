@@ -1,0 +1,5 @@
+upstream: https://code.videolan.org/videolan/vlc.git
+branch:   master (4.0.0-dev), pinned below HEAD for matching prebuilt contribs
+commit:   15b71e3fa6d49ed2845dfb1324760984eae6101c (last contrib-changing commit with a published prebuilt)
+date:     2026-09-29
+win64 image: registry.videolan.org/vlc-debian-win64-posix:20260611225331

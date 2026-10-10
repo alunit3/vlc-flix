@@ -84,6 +84,7 @@
 
 #include <vlc_interface.h>
 #include <vlc_preparser.h>
+#include <vlc_strings.h>
 
 #define VLC_REFERENCE_SCALE_FACTOR 96.
 
@@ -672,6 +673,20 @@ QUrl MainCtx::folderMRL(const QUrl &fileMRL) const
 QString MainCtx::displayMRL(const QUrl &mrl) const
 {
     return urlToDisplayString(mrl);
+}
+
+QString MainCtx::cleanTitle(const QString &name) const
+{
+    if (name.isEmpty())
+        return name;
+
+    char *display = vlc_release_name_display(qtu(name));
+    if (display == nullptr)
+        return name;
+
+    const QString result = qfu(display);
+    free(display);
+    return result;
 }
 
 void MainCtx::setPlayerPlaylistWidth( double factor )

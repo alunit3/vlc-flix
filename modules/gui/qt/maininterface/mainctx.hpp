@@ -412,6 +412,9 @@ public:
 
     Q_INVOKABLE QString displayMRL(const QUrl &mrl) const;
 
+    // flix: "Donnie.Darko.2001.1080p.BluRay" -> "Donnie Darko (2001)"
+    Q_INVOKABLE QString cleanTitle(const QString &name) const;
+
     double artistAlbumsWidth() const;
     void setArtistAlbumsWidth(double newArtistAlbumsWidth);
 

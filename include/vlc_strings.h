@@ -239,6 +239,47 @@ VLC_API int vlc_filenamecmp(const char *, const char *);
 void filename_sanitize(char *);
 
 /**
+ * Information guessed from a release / torrent style file name such as
+ * "Donnie.Darko.2001.REMASTERED.DC.1080p.BluRay.H264.AAC.mkv".
+ */
+struct vlc_release_info
+{
+    char *title;        /**< cleaned title ("Donnie Darko"), never NULL on success */
+    int year;           /**< release year, 0 if unknown */
+    int season;         /**< season number, 0 if not a TV episode */
+    int episode;        /**< episode number, 0 if unknown */
+    char resolution[8]; /**< "480p", "720p", "1080p", "2160p", "4K"... or "" */
+};
+
+/**
+ * Guess the title, year, season/episode and resolution from a file name.
+ *
+ * The name may use dots, underscores or spaces as separators and may carry
+ * an extension, [bracket] tags or (parenthesised) years.
+ *
+ * \param name file name (or media title), with or without extension
+ * \param info receives the result; free with vlc_release_info_clean()
+ * \return 0 if release information (year, resolution, source, episode...)
+ *         was recognised, -1 if the name looks like a plain human title. In
+ *         both cases info->title is set, unless memory allocation failed
+ *         (info->title is then NULL).
+ */
+VLC_API int vlc_release_name_parse(const char *name, struct vlc_release_info *info);
+
+/** Release the memory held by a vlc_release_info. */
+VLC_API void vlc_release_info_clean(struct vlc_release_info *info);
+
+/**
+ * Build a display name from a release / torrent style file name:
+ * "Title (Year)" for movies, "Title - S01E02" for episodes, the cleaned title
+ * otherwise. A name that is not a release name is returned unchanged
+ * (minus a known video extension).
+ *
+ * \return a heap allocated string, or NULL on allocation failure
+ */
+VLC_API char *vlc_release_name_display(const char *name) VLC_MALLOC;
+
+/**
  * @}
  */
 

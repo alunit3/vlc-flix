@@ -99,7 +99,7 @@ Item {
             anchors.rightMargin: VLCStyle.dp(10, VLCStyle.scale)
             anchors.bottomMargin: VLCStyle.dp(10, VLCStyle.scale) + (root.progress > 0 ? VLCStyle.dp(4, VLCStyle.scale) : 0)
 
-            text: root.model.title || qsTr("Unknown title")
+            text: MainCtx.cleanTitle(root.model.title) || qsTr("Unknown title")
             color: "#FFFFFF"
             font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
             font.weight: Font.DemiBold

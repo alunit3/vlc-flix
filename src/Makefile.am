@@ -383,6 +383,7 @@ libvlccore_la_SOURCES = \
 	network/tls.c \
 	text/charset.c \
 	text/memstream.c \
+	text/release_name.c \
 	text/strings.c \
 	text/unicode.c \
 	text/url.c \

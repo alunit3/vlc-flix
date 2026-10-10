@@ -1,6 +1,6 @@
-# Fast edit loop: incremental rebuild, then replace ONLY the Qt plugin in D:\vlc-fork\run.
-# (The build is unstripped; the Qt plugin is ~1.3 GB, so we strip it while copying out.)
-#   ./flix/dev.ps1            rebuild + install plugin
+# Fast edit loop: incremental rebuild, then replace ONLY the Qt plugin and libvlccore in D:\vlc-fork\run.
+# (The build is unstripped; the Qt plugin is ~1.3 GB, so we strip both while copying out.)
+#   ./flix/dev.ps1            rebuild + install plugin and core
 #   ./flix/dev.ps1 -Launch    ...and start VLC in portable mode (-I qt)
 param([switch]$Launch, [int]$Jobs = 2, [string]$Media = "")
 $ErrorActionPreference = "Stop"
@@ -27,19 +27,24 @@ make -C modules/gui/qt install-pluginLTLIBRARIES >/dev/null 2>&1 || make install
 P=`$(find _win32/lib/vlc/plugins/gui -name libqt_plugin.dll | head -1)
 echo "plugin: `$P"
 x86_64-w64-mingw32-strip --strip-unneeded -o /out/libqt_plugin.dll.new "`$P"
-ls -la /out/libqt_plugin.dll.new
+x86_64-w64-mingw32-strip --strip-unneeded -o /out/libvlccore.dll.new src/.libs/libvlccore.dll
+ls -la /out/libqt_plugin.dll.new /out/libvlccore.dll.new
 "@ -replace "`r", ""
 
 docker run --rm -v "${src}:/vlc" -v "vlcbuild:/build" -v "${run}:/out" $image bash -c $script
 if ($LASTEXITCODE) { throw "dev build failed ($LASTEXITCODE)" }
 
-# Swap the new plugin in. A running (or hung) VLC keeps the old DLL open, but Windows still
-# lets us rename it out of the way, so give any existing file a unique name first.
-$new = Join-Path $run "libqt_plugin.dll.new"
-$dst = Join-Path $run "plugins\gui\libqt_plugin.dll"
-if (Test-Path $dst) { Rename-Item $dst ("libqt_plugin.dll.old." + (Get-Date -Format yyyyMMddHHmmss)) }
-Move-Item $new $dst
-Get-ChildItem (Split-Path $dst) -Filter "*.old*" | ForEach-Object { Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue }
+# Swap a freshly built file in. A running (or hung) VLC keeps the old DLL open, but Windows
+# still lets us rename it out of the way, so give any existing file a unique name first.
+function Install-Built([string]$New, [string]$Dst) {
+    $leaf = Split-Path $Dst -Leaf
+    if (Test-Path $Dst) { Rename-Item $Dst ($leaf + ".old." + (Get-Date -Format yyyyMMddHHmmssfff)) }
+    Move-Item $New $Dst
+    Get-ChildItem (Split-Path $Dst) -Filter ($leaf + ".old*") |
+        ForEach-Object { Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue }
+}
+Install-Built (Join-Path $run "libqt_plugin.dll.new") (Join-Path $run "plugins\gui\libqt_plugin.dll")
+Install-Built (Join-Path $run "libvlccore.dll.new")   (Join-Path $run "libvlccore.dll")
 
 if ($Launch) {
     New-Item -ItemType Directory -Force (Join-Path $run "portable") | Out-Null

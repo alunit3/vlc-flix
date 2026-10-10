@@ -42,7 +42,7 @@ Widgets.GridItem {
     fallbackImage: VLCStyle.noArtVideoCover
     fillMode: Image.Stretch
 
-    title: model.title || qsTr("Unknown title")
+    title: MainCtx.cleanTitle(model.title) || qsTr("Unknown title")
     subtitle: model?.duration?.formatHMS() ?? ""
     pictureWidth: VLCStyle.gridCover_video_width
     pictureHeight: VLCStyle.gridCover_video_height

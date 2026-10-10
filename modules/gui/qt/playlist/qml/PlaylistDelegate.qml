@@ -284,7 +284,7 @@ T.Control {
                 Layout.fillWidth: true
 
                 font.weight: delegate.isCurrent ? Font.Bold : Font.DemiBold
-                text: delegate.title || qsTr("Unknown Title")
+                text: MainCtx.cleanTitle(delegate.title) || qsTr("Unknown Title")
                 color: theme.fg.primary
             }
 

@@ -65,6 +65,7 @@ check_PROGRAMS = \
 	test_src_misc_bits \
 	test_src_misc_chroma_probe \
 	test_src_misc_epg \
+	test_src_text_release_name \
 	test_src_misc_keystore \
 	test_src_misc_image \
 	test_src_misc_viewpoint \
@@ -308,6 +309,8 @@ test_src_player_tracks_ids_SOURCES = src/player/common.h src/player/modules.c \
 test_src_player_tracks_ids_LDADD = $(LIBVLCCORE) $(LIBVLC) $(LIBM)
 test_src_misc_bits_SOURCES = src/misc/bits.c
 test_src_misc_bits_LDADD = $(LIBVLC)
+test_src_text_release_name_SOURCES = src/text/release_name.c
+test_src_text_release_name_LDADD = $(LIBVLCCORE) $(LIBVLC)
 test_src_misc_epg_SOURCES = src/misc/epg.c
 test_src_misc_epg_LDADD = $(LIBVLCCORE) $(LIBVLC)
 test_src_misc_keystore_SOURCES = src/misc/keystore.c

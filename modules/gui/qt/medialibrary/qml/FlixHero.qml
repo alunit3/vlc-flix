@@ -123,7 +123,7 @@ Item {
 
                 Text {
                     width: parent.width
-                    text: slide.model.title || qsTr("Unknown title")
+                    text: MainCtx.cleanTitle(slide.model.title) || qsTr("Unknown title")
                     color: "#FFFFFF"
                     font.pixelSize: VLCStyle.dp(44, VLCStyle.scale)
                     font.weight: Font.Bold

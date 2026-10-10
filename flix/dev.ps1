@@ -1,7 +1,7 @@
 # Fast edit loop: incremental rebuild, then replace ONLY the Qt plugin in D:\vlc-fork\run.
 # (The build is unstripped; the Qt plugin is ~1.3 GB, so we strip it while copying out.)
 #   ./flix/dev.ps1            rebuild + install plugin
-#   ./flix/dev.ps1 -Launch    ...and start VLC with the fork's own config (-I qt)
+#   ./flix/dev.ps1 -Launch    ...and start VLC in portable mode (-I qt)
 param([switch]$Launch, [int]$Jobs = 2, [string]$Media = "")
 $ErrorActionPreference = "Stop"
 
@@ -26,8 +26,8 @@ docker run --rm -v "${src}:/vlc" -v "vlcbuild:/build" -v "${run}:/out" $image ba
 if ($LASTEXITCODE) { throw "dev build failed ($LASTEXITCODE)" }
 
 if ($Launch) {
-    New-Item -ItemType Directory -Force (Join-Path $root "config") | Out-Null
-    $a = @("-I", "qt", "--config=$root\config\vlcrc", "--no-one-instance", "--no-qt-privacy-ask", "--no-media-library")
+    New-Item -ItemType Directory -Force (Join-Path $run "portable") | Out-Null
+    $a = @("-I", "qt", "--no-one-instance", "--no-qt-privacy-ask", "--no-qt-updates-notif", "--no-media-library")
     if ($Media) { $a += "`"$Media`"" }
     Start-Process (Join-Path $run "vlc.exe") -ArgumentList $a -WorkingDirectory $run
 }

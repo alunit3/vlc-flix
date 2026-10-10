@@ -101,22 +101,21 @@ decltype (ControlbarProfileModel::m_defaults)
                         PlayerControlbarModel::Videoplayer,
                         {
                             {
+                                // flix: streaming-style layout
+                                // left: play, -10s, +10s, volume
                                 {
-                                    ControlListModel::LANG_BUTTON,
-                                    ControlListModel::BOOKMARK_BUTTON,
-                                    ControlListModel::EXTENDED_BUTTON,
-                                    ControlListModel::NAVIGATION_BUTTONS
-                                },
-                                {
-                                    ControlListModel::SKIP_BACK_BUTTON,
-                                    ControlListModel::PREVIOUS_BUTTON,
                                     ControlListModel::PLAY_BUTTON,
-                                    ControlListModel::NEXT_BUTTON,
-                                    ControlListModel::SKIP_FW_BUTTON
+                                    ControlListModel::SKIP_BACK_BUTTON,
+                                    ControlListModel::SKIP_FW_BUTTON,
+                                    ControlListModel::VOLUME
                                 },
+                                // centre: empty (the title is drawn by TopBar.qml)
+                                {},
+                                // right: next, audio/subtitles, episodes, fullscreen
                                 {
-                                    ControlListModel::VOLUME,
-                                    ControlListModel::RENDERER_BUTTON,
+                                    ControlListModel::NEXT_BUTTON,
+                                    ControlListModel::LANG_BUTTON,
+                                    ControlListModel::PLAYLIST_BUTTON,
                                     ControlListModel::FULLSCREEN_BUTTON
                                 }
                             }

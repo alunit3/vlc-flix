@@ -36,7 +36,7 @@ Widgets.IconToolButton {
     }
     checked: MainCtx.playqueuePanel.visible
 
-    description: qsTr("Play Queue")
+    description: qsTr("Episodes")
 
     AccessibleCompat.id: "playqueueButton"
 }

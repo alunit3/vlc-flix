@@ -60,7 +60,7 @@ T.Pane {
     verticalPadding: VLCStyle.margin_normal
 
     Accessible.role: Accessible.Pane
-    Accessible.name: qsTr("Play Queue")
+    Accessible.name: qsTr("Episodes")
     AccessibleCompat.id: "playqueuePane"
 
     readonly property ColorContext colorContext: ColorContext {
@@ -125,7 +125,7 @@ T.Pane {
             spacing: VLCStyle.margin_xxxsmall
 
             Widgets.SubtitleLabel {
-                text: qsTr("Play Queue")
+                text: qsTr("Episodes")
                 color: theme.fg.primary
                 font.weight: Font.Bold
                 font.pixelSize: VLCStyle.dp(24, VLCStyle.scale)

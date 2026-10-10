@@ -111,19 +111,19 @@ public:
     Q_PROPERTY(CSDMetrics* csdMetrics READ getCSDMetrics NOTIFY CSDMetricsChanged FINAL)
 
     //standard color definitions used by light/dark themes
-    COLOR_DEFINITION(orange500, "#FF8800");
-    COLOR_DEFINITION(orange800, "#FF610A");
+    COLOR_DEFINITION(orange500, "#E50914"); // flix: accent red (was #FF8800)
+    COLOR_DEFINITION(orange800, "#B20710"); // flix: darker red for light theme (was #FF610A)
 
     COLOR_DEFINITION(orange400, "#f89a06"); //FIXME name have been chosen randomly by me
     COLOR_DEFINITION(orange200, "#e29a06"); //FIXME name have been chosen randomly by me
 
-    COLOR_DEFINITION(darkGrey200, "#1E1E1E");
-    COLOR_DEFINITION(darkGrey300, "#212121");
-    COLOR_DEFINITION(darkGrey400, "#242424");
-    COLOR_DEFINITION(darkGrey500, "#272727");
-    COLOR_DEFINITION(darkGrey600, "#2A2A2A");
-    COLOR_DEFINITION(darkGrey700, "#2D2D2D");
-    COLOR_DEFINITION(darkGrey800, "#303030");
+    COLOR_DEFINITION(darkGrey200, "#141414"); // flix: Netflix-style neutrals (was #1E1E1E..#303030)
+    COLOR_DEFINITION(darkGrey300, "#181818");
+    COLOR_DEFINITION(darkGrey400, "#1C1C1C");
+    COLOR_DEFINITION(darkGrey500, "#202020");
+    COLOR_DEFINITION(darkGrey600, "#252525");
+    COLOR_DEFINITION(darkGrey700, "#2A2A2A");
+    COLOR_DEFINITION(darkGrey800, "#2F2F2F");
 
     COLOR_DEFINITION(lightGrey100, "#FAFAFA");
     COLOR_DEFINITION(lightGrey200, "#F6F6F6");

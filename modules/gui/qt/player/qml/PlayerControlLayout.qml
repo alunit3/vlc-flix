@@ -69,6 +69,25 @@ FocusScope {
 
     // Children
 
+    // flix: title of what is playing, in the exact middle of the video player bar.
+    // At most 28% of the bar, and not at all on narrow windows.
+    Loader {
+        id: loaderTitle
+
+        anchors.centerIn: parent
+
+        active: (playerControlLayout.identifier === PlayerControlbarModel.Videoplayer)
+                && (playerControlLayout.width > VLCStyle.dp(900, VLCStyle.scale))
+        source: "qrc:///qt/qml/VLC/PlayerControls/FlixTitleWidget.qml"
+
+        Binding {
+            target: loaderTitle.item
+            property: "maxWidth"
+            when: loaderTitle.item !== null
+            value: Math.min(VLCStyle.dp(560, VLCStyle.scale), playerControlLayout.width * 0.28)
+        }
+    }
+
     Loader {
         id: loaderLeftRight
 

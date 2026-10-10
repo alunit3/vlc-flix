@@ -2,7 +2,8 @@
 # (The build is unstripped; the Qt plugin is ~1.3 GB, so we strip both while copying out.)
 #   ./flix/dev.ps1            rebuild + install plugin and core
 #   ./flix/dev.ps1 -Launch    ...and start VLC in portable mode (-I qt)
-param([switch]$Launch, [int]$Jobs = 2, [string]$Media = "")
+#   ./flix/dev.ps1 -ResetLayout   forget the saved control bar layout (needed after changing the default layout)
+param([switch]$Launch, [switch]$ResetLayout, [int]$Jobs = 2, [string]$Media = "")
 $ErrorActionPreference = "Stop"
 
 $image = "registry.videolan.org/vlc-debian-win64-posix:20260611225331"
@@ -17,6 +18,21 @@ Get-Process vlc -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHand
 Start-Sleep -Seconds 3
 Get-Process vlc -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } |
     Stop-Process -Force -ErrorAction SilentlyContinue
+
+# The control bar layout is saved in the portable settings and then wins over the defaults in the code.
+if ($ResetLayout) {
+    $ini = Join-Path $run ("portable" + [IO.Path]::DirectorySeparatorChar + "vlc" + [IO.Path]::DirectorySeparatorChar + "vlc-qt-interface.ini")
+    if (Test-Path $ini) {
+        $keep = New-Object System.Collections.Generic.List[string]
+        $skip = $false
+        foreach ($l in [IO.File]::ReadAllLines($ini)) {
+            if ($l -match '^\[ControlbarProfileModel\]') { $skip = $true; continue }
+            if ($skip -and $l -match '^\[') { $skip = $false }
+            if (-not $skip) { $keep.Add($l) }
+        }
+        [IO.File]::WriteAllLines($ini, $keep)
+    }
+}
 
 $script = @"
 set -e

@@ -277,6 +277,8 @@ FocusScope {
                     cursorShape: playerSpecializationLoader.cursorShape
 
                     function onMouseEvent() {
+                        flixPauseOverlay.activity()
+
                         //short interval for mouse events
                         if (Player.isInteractive)
                             interactiveAutoHideTimer.restart()
@@ -932,8 +934,9 @@ FocusScope {
 
     // flix: "You're watching" screen when paused and the controls are hidden
     FlixPauseOverlay {
+        id: flixPauseOverlay
+
         anchors.fill: parent
-        idle: !playerToolbarVisibilityFSM.isVisible
     }
 
     TopBar {

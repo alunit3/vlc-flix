@@ -70,7 +70,9 @@ Repeater {
             when: condition
             value: {
                 if (condition)
-                    return (loader.x + loader.Layout.minimumWidth <= repeater.availableWidth)
+                    // flix: 1px tolerance. The last right-aligned item sits exactly on the
+                    // limit, and with fractional text widths rounding could hide it.
+                    return (loader.x + loader.Layout.minimumWidth <= repeater.availableWidth + 1)
                 else
                     return true;
             }

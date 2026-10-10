@@ -22,19 +22,22 @@ import VLC.Player
 import VLC.Playlist
 import VLC.Style
 
-// flix: shown when the video is paused and the controls have auto-hidden.
-// "You're watching" / title / season + episode, "Paused" in the corner.
-// Any mouse movement (which brings the controls back) hides it again.
+// flix: shown when the video has been paused for a few seconds without any mouse
+// activity: "You're watching" / title / season + episode, "Paused" in the corner.
+// Player.qml calls activity() on every mouse event, which hides the screen again.
 Item {
     id: root
 
-    // true while the player controls are hidden (idle)
-    property bool idle: false
-
     readonly property bool paused: Player.playingState === Player.PLAYING_STATE_PAUSED
-    readonly property bool wanted: paused && idle
 
     property bool armed: false
+
+    // call on any mouse / key activity
+    function activity() {
+        armed = false
+        if (paused)
+            idleTimer.restart()
+    }
 
     readonly property string display: MainCtx.cleanTitle(Player.title)
     readonly property var episode: display.match(/^(.*) - S(\d+)E(\d+)$/)
@@ -46,17 +49,20 @@ Item {
         NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
     }
 
-    onWantedChanged: {
-        if (!wanted)
-            armed = false
+    onPausedChanged: {
+        armed = false
+        if (paused)
+            idleTimer.restart()
+        else
+            idleTimer.stop()
     }
 
-    // wait a moment so a quick pause does not flash the screen
+    // wait a few seconds so pausing for a moment does not flash the screen
     Timer {
-        interval: 1500
-        running: root.wanted && !root.armed
+        id: idleTimer
+        interval: 4000
         repeat: false
-        onTriggered: root.armed = true
+        onTriggered: root.armed = root.paused
     }
 
     Rectangle {
@@ -109,7 +115,7 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: VLCStyle.dp(64, VLCStyle.scale)
-        anchors.bottomMargin: VLCStyle.dp(64, VLCStyle.scale)
+        anchors.bottomMargin: VLCStyle.dp(150, VLCStyle.scale)
 
         text: qsTr("Paused")
         color: "#FFFFFF"

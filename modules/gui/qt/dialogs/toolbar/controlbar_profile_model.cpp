@@ -109,10 +109,9 @@ decltype (ControlbarProfileModel::m_defaults)
                                     ControlListModel::SKIP_FW_BUTTON,
                                     ControlListModel::VOLUME
                                 },
-                                // centre: what is playing
-                                {
-                                    ControlListModel::FLIX_TITLE
-                                },
+                                // centre: empty, the title is drawn in the exact middle
+                                // of the bar by PlayerControlLayout.qml
+                                {},
                                 // right: next, episodes, subtitles, speed, fullscreen
                                 {
                                     ControlListModel::NEXT_BUTTON,

@@ -28,12 +28,20 @@ Item {
 
     property bool paintOnly: false
 
+    // upper bound for the width, set by the layout so the title never overlaps other controls
+    property real maxWidth: VLCStyle.dp(560, VLCStyle.scale)
+
     readonly property string _display: MainCtx.cleanTitle(Player.title)
     readonly property var _episode: _display.match(/^(.*) - S(\d+)E(\d+)$/)
 
+    // A label's implicitWidth is the width of its full text and does not depend on its
+    // width, so these do not depend on each other.
+    readonly property real _episodeWidth: (!paintOnly && _episode !== null) ? (episodeLabel.implicitWidth + row.spacing) : 0
+    readonly property real _mainWidth: Math.min(mainLabel.implicitWidth, Math.max(0, maxWidth - _episodeWidth))
+
     implicitHeight: VLCStyle.icon_toolbar
-    implicitWidth: paintOnly ? VLCStyle.icon_toolbar * 3
-                             : Math.min(row.implicitWidth, VLCStyle.dp(560, VLCStyle.scale))
+    implicitWidth: paintOnly ? VLCStyle.icon_toolbar * 3 : (_mainWidth + _episodeWidth)
+
 
     readonly property ColorContext colorContext: ColorContext {
         id: theme
@@ -49,7 +57,7 @@ Item {
         Text {
             id: mainLabel
 
-            width: Math.min(implicitWidth, root.implicitWidth - (episodeLabel.visible ? episodeLabel.implicitWidth + row.spacing : 0))
+            width: root._mainWidth
             text: root.paintOnly ? qsTr("Title") : (root._episode ? root._episode[1] : root._display)
             color: theme.fg.primary
             font.pixelSize: VLCStyle.dp(15, VLCStyle.scale)

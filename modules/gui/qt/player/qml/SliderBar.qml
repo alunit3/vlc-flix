@@ -19,6 +19,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Templates as T
 import QtQuick.Layouts
+import QtQuick.Window
 
 import VLC.Player
 import VLC.Widgets as Widgets
@@ -72,7 +73,9 @@ T.ProgressBar {
         onTriggered: control._isSeekPointsShown = false
     }
 
+    // flix: when a frame preview is shown the text tooltip is not needed
     Widgets.PointingToolTipAttached.visible: (hoverHandler.hovered || control.visualFocus || dragHandler.active)
+                                             && !(thumbs.available && hoverHandler.hovered)
 
     Widgets.PointingToolTipAttached.text: {
         if (!Widgets.PointingToolTipAttached.instance?.visible)
@@ -205,10 +208,116 @@ T.ProgressBar {
     //we use our own HoverHandler
     hoverEnabled: false
 
+    // flix: frame preview + time pill above the bar while hovering it
+    SeekThumbnailer {
+        id: thumbs
+
+        ctx: MainCtx
+        player: Player
+    }
+
+    property real _previewX: 0          // hovered x, in window coordinates
+    property real _previewY: 0          // top of the bar, in window coordinates
+    property string _previewTime: ""
+
+    function _updatePreview() {
+        if (!hoverHandler.hovered || !Player.length.valid())
+            return
+
+        const x = Helpers.clamp(hoverHandler.point.position.x, 0, control.width)
+        const tick = Player.length.scale(x / control.width)
+
+        _previewTime = tick.formatHMS(Player.length.isSubSecond() ? VLCTick.SubSecondFormattedAsMS : 0)
+
+        if (preview.parent) {
+            const p = control.mapToItem(preview.parent, x, 0)
+            _previewX = p.x
+            _previewY = p.y
+        }
+
+        thumbs.request(tick.toSeconds())
+    }
+
+    Item {
+        id: preview
+
+        // the window's content item: never clipped by the control bar and above everything
+        parent: control.Window.window ? control.Window.window.contentItem : control
+        z: 10000
+
+        readonly property real gap: VLCStyle.dp(6, VLCStyle.scale)
+
+        visible: hoverHandler.hovered && thumbs.available && Player.length.valid()
+                 && thumbs.source.toString() !== ""
+
+        width: Math.max(frame.width, pill.width)
+        height: frame.height + gap + pill.height
+
+        x: Helpers.clamp(control._previewX - width / 2, VLCStyle.dp(8, VLCStyle.scale),
+                         Math.max(VLCStyle.dp(8, VLCStyle.scale), (parent ? parent.width : 0) - width - VLCStyle.dp(8, VLCStyle.scale)))
+        y: control._previewY - height - VLCStyle.dp(16, VLCStyle.scale)
+
+        Rectangle {
+            id: frame
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: VLCStyle.dp(224, VLCStyle.scale)
+            height: shot.height + 2 * border.width
+            color: "black"
+            border.width: VLCStyle.dp(2, VLCStyle.scale)
+            border.color: "#FFFFFF"
+            radius: VLCStyle.dp(4, VLCStyle.scale)
+
+            Image {
+                id: shot
+
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: frame.border.width
+                width: parent.width - 2 * frame.border.width
+                height: (implicitWidth > 0) ? Math.round(width * implicitHeight / implicitWidth)
+                                            : Math.round(width * 9 / 16)
+
+                source: thumbs.source
+                fillMode: Image.PreserveAspectFit
+                asynchronous: true
+                cache: true
+            }
+        }
+
+        Rectangle {
+            id: pill
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: frame.bottom
+            anchors.topMargin: preview.gap
+
+            width: timeLabel.implicitWidth + 2 * VLCStyle.dp(10, VLCStyle.scale)
+            height: timeLabel.implicitHeight + 2 * VLCStyle.dp(4, VLCStyle.scale)
+            radius: height / 2
+            color: Qt.rgba(0, 0, 0, 0.82)
+
+            Text {
+                id: timeLabel
+
+                anchors.centerIn: parent
+                text: control._previewTime
+                color: "#FFFFFF"
+                font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
+                font.weight: Font.DemiBold
+            }
+        }
+    }
+
     HoverHandler {
         id: hoverHandler
 
+        onPointChanged: control._updatePreview()
+
         onHoveredChanged: () => {
+            if (!hovered)
+                thumbs.clear()
+
             if (hovered) {
                 if(Player.hasChapters)
                     control._isSeekPointsShown = true

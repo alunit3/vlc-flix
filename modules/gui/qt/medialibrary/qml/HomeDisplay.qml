@@ -60,7 +60,8 @@ Widgets.PageLoader {
     Component {
         id: homeComponent
 
-        HomePage {
+        // flix: streaming-style home (upstream: HomePage)
+        FlixHomePage {
             focus: true
 
             onSeeAllButtonClicked: (name, reason) => {

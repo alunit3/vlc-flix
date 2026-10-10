@@ -18,16 +18,24 @@ make -j$Jobs
 make -C modules/gui/qt install-pluginLTLIBRARIES >/dev/null 2>&1 || make install >/dev/null
 P=`$(find _win32/lib/vlc/plugins/gui -name libqt_plugin.dll | head -1)
 echo "plugin: `$P"
-x86_64-w64-mingw32-strip --strip-unneeded -o /out/plugins/gui/libqt_plugin.dll "`$P"
-ls -la /out/plugins/gui/libqt_plugin.dll
+x86_64-w64-mingw32-strip --strip-unneeded -o /out/libqt_plugin.dll.new "`$P"
+ls -la /out/libqt_plugin.dll.new
 "@ -replace "`r", ""
 
 docker run --rm -v "${src}:/vlc" -v "vlcbuild:/build" -v "${run}:/out" $image bash -c $script
 if ($LASTEXITCODE) { throw "dev build failed ($LASTEXITCODE)" }
 
+# Swap the new plugin in. A running (or hung) VLC keeps the old DLL open, but Windows still
+# lets us rename it out of the way, so give any existing file a unique name first.
+$new = Join-Path $run "libqt_plugin.dll.new"
+$dst = Join-Path $run "plugins\gui\libqt_plugin.dll"
+if (Test-Path $dst) { Rename-Item $dst ("libqt_plugin.dll.old." + (Get-Date -Format yyyyMMddHHmmss)) }
+Move-Item $new $dst
+Get-ChildItem (Split-Path $dst) -Filter "*.old*" | ForEach-Object { Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue }
+
 if ($Launch) {
     New-Item -ItemType Directory -Force (Join-Path $run "portable") | Out-Null
-    $a = @("-I", "qt", "--no-one-instance", "--no-qt-privacy-ask", "--no-qt-updates-notif", "--no-media-library")
+    $a = @("-I", "qt", "--no-one-instance", "--no-qt-privacy-ask", "--no-qt-updates-notif")
     if ($Media) { $a += "`"$Media`"" }
     Start-Process (Join-Path $run "vlc.exe") -ArgumentList $a -WorkingDirectory $run
 }

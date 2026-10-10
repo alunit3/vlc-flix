@@ -33,6 +33,12 @@ FocusScope {
     property real sideMargin: VLCStyle.dp(48, VLCStyle.scale)
     property bool showSeeAll: false
 
+    // draw the watched-progress bar under each card (continue watching)
+    property bool progressBelow: false
+
+    // show the "NEW" tag on the first few cards of this row
+    property bool showNewTags: false
+
     // the page flickable, so the mouse wheel keeps scrolling the page while over a row
     property Flickable pageFlickable: null
 
@@ -41,6 +47,7 @@ FocusScope {
     signal moveDown()
 
     readonly property real _cardHeight: Math.round(list.cardWidth * 9 / 16)
+                                        + (progressBelow ? VLCStyle.dp(16, VLCStyle.scale) : 0)
     readonly property real _vpad: VLCStyle.dp(14, VLCStyle.scale)
 
     visible: list.count > 0
@@ -127,6 +134,8 @@ FocusScope {
             id: card
 
             current: ListView.isCurrentItem && list.activeFocus
+            progressBelow: root.progressBelow
+            showNew: root.showNewTags && index < 4
 
             onActivated: {
                 list.currentIndex = index

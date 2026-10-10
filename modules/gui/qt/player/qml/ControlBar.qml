@@ -162,7 +162,7 @@ T.Pane {
                 readonly property bool showRemainingTime: (MainCtx.showRemainingTime && Player.remainingTime.valid())
 
                 text: showRemainingTime
-                      ? "-" + Player.remainingTime.formatHMS()
+                      ? Player.remainingTime.formatHMS()
                       : Player.length.formatHMS()
                 color: mediaTime.color
                 font: timeTextMetrics.font
@@ -219,6 +219,7 @@ T.Pane {
                 id: trackPositionSlider
 
                 barHeight: root.sliderHeight
+                backgroundColor: Qt.rgba(1, 1, 1, 0.35)   // flix: lighter remaining part
 
                 Accessible.role: Accessible.Slider
                 Accessible.name: qsTr("Progress")
@@ -276,7 +277,7 @@ T.Pane {
             children: {
                 switch (textPosition) {
                 case ControlBar.TimeTextPosition.AboveSlider:
-                    return [mediaTime, mediaRemainingTime]
+                    return [mediaRemainingTime]   // flix: only the remaining time, on the right
                 case ControlBar.TimeTextPosition.Hide:
                 case ControlBar.TimeTextPosition.LeftRightSlider:
                 default:

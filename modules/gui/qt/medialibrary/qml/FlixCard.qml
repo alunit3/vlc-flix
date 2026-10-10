@@ -19,10 +19,12 @@ import QtQuick
 
 import VLC.MediaLibrary
 import VLC.MainInterface
+import VLC.Widgets as Widgets
 import VLC.Style
 
-// flix: one 16:9 poster card of a FlixRow. Scales up on hover / keyboard focus,
-// shows the title over a gradient and a red progress bar for partly watched items.
+// flix: one 16:9 card of a FlixRow with rounded corners. Scales up on hover / keyboard
+// focus, shows the (cleaned) title over a gradient, a "NEW" tag for items that were
+// never played, and, in "continue watching" rows, a progress bar under the card.
 Item {
     id: root
 
@@ -33,15 +35,23 @@ Item {
     // true when this card is the current item of a row that has the keyboard focus
     property bool current: false
 
+    // reserve room under the picture for the progress bar (continue watching rows)
+    property bool progressBelow: false
+
+    // allow the "NEW" tag (set by the row, for its first few cards only)
+    property bool showNew: false
+
     property real cardWidth: VLCStyle.dp(264, VLCStyle.scale)
-    readonly property real cardHeight: Math.round(cardWidth * 9 / 16)
+    readonly property real pictureHeight: Math.round(cardWidth * 9 / 16)
+    readonly property real barSpace: progressBelow ? VLCStyle.dp(16, VLCStyle.scale) : 0
     readonly property bool active: hover.hovered || current
     readonly property real progress: Math.max(0, Math.min(1, root.model.progress ?? 0))
+    readonly property real radius: VLCStyle.dp(6, VLCStyle.scale)
 
     signal activated()
 
     width: cardWidth
-    height: cardHeight
+    height: pictureHeight + barSpace
 
     z: active ? 2 : 0
     scale: active ? 1.12 : 1.0
@@ -51,27 +61,32 @@ Item {
         NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
     }
 
-    Rectangle {
-        id: frame
+    Item {
+        id: picture
 
-        anchors.fill: parent
-        radius: VLCStyle.dp(3, VLCStyle.scale)
-        color: "#2A2A2A"
+        width: parent.width
+        height: root.pictureHeight
 
-        Image {
+        Rectangle {
+            anchors.fill: parent
+            radius: root.radius
+            color: "#2A2A2A"
+        }
+
+        Widgets.ImageExt {
             id: art
 
             anchors.fill: parent
             source: root.model.thumbnail || ""
             fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-            visible: status === Image.Ready
+            radius: root.radius
+            backgroundColor: "transparent"
         }
 
         Text {
             anchors.centerIn: parent
             visible: art.status !== Image.Ready
-            text: "\u25B6"
+            text: "▶"
             color: "#4D4D4D"
             font.pixelSize: VLCStyle.dp(30, VLCStyle.scale)
         }
@@ -82,6 +97,7 @@ Item {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             height: parent.height * 0.6
+            radius: root.radius
 
             gradient: Gradient {
                 GradientStop { position: 0.0; color: "transparent" }
@@ -95,15 +111,36 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            anchors.leftMargin: VLCStyle.dp(10, VLCStyle.scale)
-            anchors.rightMargin: VLCStyle.dp(10, VLCStyle.scale)
-            anchors.bottomMargin: VLCStyle.dp(10, VLCStyle.scale) + (root.progress > 0 ? VLCStyle.dp(4, VLCStyle.scale) : 0)
+            anchors.margins: VLCStyle.dp(10, VLCStyle.scale)
 
             text: MainCtx.cleanTitle(root.model.title) || qsTr("Unknown title")
             color: "#FFFFFF"
             font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
             font.weight: Font.DemiBold
             elide: Text.ElideRight
+        }
+
+        // "NEW": never played
+        Rectangle {
+            visible: root.showNew && root.model.isNew === true
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.margins: VLCStyle.dp(8, VLCStyle.scale)
+            width: newLabel.implicitWidth + 2 * VLCStyle.dp(7, VLCStyle.scale)
+            height: newLabel.implicitHeight + VLCStyle.dp(4, VLCStyle.scale)
+            radius: VLCStyle.dp(3, VLCStyle.scale)
+            color: "#E50914"
+
+            Text {
+                id: newLabel
+
+                anchors.centerIn: parent
+                text: qsTr("NEW")
+                color: "#FFFFFF"
+                font.pixelSize: VLCStyle.dp(10, VLCStyle.scale)
+                font.weight: Font.Bold
+                font.letterSpacing: VLCStyle.dp(0.5, VLCStyle.scale)
+            }
         }
 
         // play badge, only while hovered / focused
@@ -122,35 +159,41 @@ Item {
             Text {
                 anchors.centerIn: parent
                 anchors.horizontalCenterOffset: VLCStyle.dp(2, VLCStyle.scale)
-                text: "\u25B6"
+                text: "▶"
                 color: "#FFFFFF"
                 font.pixelSize: VLCStyle.dp(18, VLCStyle.scale)
-            }
-        }
-
-        // watched progress
-        Rectangle {
-            visible: root.progress > 0
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: VLCStyle.dp(4, VLCStyle.scale)
-            color: "#4D4D4D"
-
-            Rectangle {
-                width: parent.width * root.progress
-                height: parent.height
-                color: "#E50914"
             }
         }
 
         // keyboard focus ring
         Rectangle {
             anchors.fill: parent
-            radius: frame.radius
+            radius: root.radius
             color: "transparent"
             border.width: root.current ? VLCStyle.dp(2, VLCStyle.scale) : 0
             border.color: "#FFFFFF"
+        }
+    }
+
+    // watched progress, under the picture
+    Item {
+        visible: root.progressBelow && root.progress > 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: VLCStyle.dp(4, VLCStyle.scale)
+
+        Rectangle {
+            anchors.fill: parent
+            radius: height / 2
+            color: "#4D4D4D"
+        }
+
+        Rectangle {
+            width: parent.width * root.progress
+            height: parent.height
+            radius: height / 2
+            color: "#E50914"
         }
     }
 

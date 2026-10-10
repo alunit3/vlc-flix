@@ -675,6 +675,24 @@ QString MainCtx::displayMRL(const QUrl &mrl) const
     return urlToDisplayString(mrl);
 }
 
+QVariantMap MainCtx::releaseInfo(const QString &name) const
+{
+    struct vlc_release_info info;
+    const bool recognized = (vlc_release_name_parse(qtu(name), &info) == 0);
+
+    QVariantMap map;
+    map.insert(QStringLiteral("recognized"), recognized);
+    map.insert(QStringLiteral("title"), info.title ? qfu(info.title) : name);
+    map.insert(QStringLiteral("year"), info.year);
+    map.insert(QStringLiteral("season"), info.season);
+    map.insert(QStringLiteral("episode"), info.episode);
+    map.insert(QStringLiteral("resolution"), qfu(info.resolution));
+    map.insert(QStringLiteral("isEpisode"), info.season > 0);
+
+    vlc_release_info_clean(&info);
+    return map;
+}
+
 QString MainCtx::cleanTitle(const QString &name) const
 {
     if (name.isEmpty())

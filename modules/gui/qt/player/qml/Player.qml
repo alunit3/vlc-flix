@@ -930,6 +930,12 @@ FocusScope {
         }
     }
 
+    // flix: "You're watching" screen when paused and the controls are hidden
+    FlixPauseOverlay {
+        anchors.fill: parent
+        idle: !playerToolbarVisibilityFSM.isVisible
+    }
+
     TopBar {
         id: topBar
 

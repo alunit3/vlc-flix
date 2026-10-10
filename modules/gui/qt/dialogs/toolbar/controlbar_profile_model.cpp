@@ -109,13 +109,16 @@ decltype (ControlbarProfileModel::m_defaults)
                                     ControlListModel::SKIP_FW_BUTTON,
                                     ControlListModel::VOLUME
                                 },
-                                // centre: empty (the title is drawn by TopBar.qml)
-                                {},
-                                // right: next, audio/subtitles, episodes, fullscreen
+                                // centre: what is playing
+                                {
+                                    ControlListModel::FLIX_TITLE
+                                },
+                                // right: next, episodes, subtitles, speed, fullscreen
                                 {
                                     ControlListModel::NEXT_BUTTON,
-                                    ControlListModel::LANG_BUTTON,
                                     ControlListModel::PLAYLIST_BUTTON,
+                                    ControlListModel::LANG_BUTTON,
+                                    ControlListModel::PLAYBACK_SPEED_BUTTON,
                                     ControlListModel::FULLSCREEN_BUTTON
                                 }
                             }

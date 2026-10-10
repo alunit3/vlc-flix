@@ -742,6 +742,7 @@ qml_modules += {
        'player/qml/LyricsFlickable.qml',
        'player/qml/MiniPlayer.qml',
        'player/qml/PIPPlayer.qml',
+       'player/qml/FlixPauseOverlay.qml',
        'player/qml/Player.qml',
        'player/qml/PlayerControlLayout.qml',
        'player/qml/PlayerPlaylistVisibilityFSM.qml',
@@ -772,6 +773,7 @@ qml_modules += {
    'sources': files(
        'player/qml/controlbarcontrols/HighResolutionTimeWidget.qml',
        'player/qml/controlbarcontrols/ArtworkInfoWidget.qml',
+       'player/qml/controlbarcontrols/FlixTitleWidget.qml',
        'player/qml/controlbarcontrols/AspectRatioWidget.qml',
        'player/qml/controlbarcontrols/AtoBButton.qml',
        'player/qml/controlbarcontrols/BackButton.qml',

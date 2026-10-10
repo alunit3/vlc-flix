@@ -415,6 +415,9 @@ public:
     // flix: "Donnie.Darko.2001.1080p.BluRay" -> "Donnie Darko (2001)"
     Q_INVOKABLE QString cleanTitle(const QString &name) const;
 
+    // flix: {recognized, title, year, season, episode, resolution, isEpisode} guessed from a file name
+    Q_INVOKABLE QVariantMap releaseInfo(const QString &name) const;
+
     double artistAlbumsWidth() const;
     void setArtistAlbumsWidth(double newArtistAlbumsWidth);
 

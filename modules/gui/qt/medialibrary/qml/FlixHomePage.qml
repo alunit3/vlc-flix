@@ -143,6 +143,7 @@ Widgets.PageExt {
 
                 width: parent.width
                 title: qsTr("Continue Watching")
+                progressBelow: true
                 sideMargin: root.sideMargin
                 pageFlickable: flick
                 showSeeAll: model.maximumCount > model.count
@@ -162,6 +163,7 @@ Widgets.PageExt {
 
                 width: parent.width
                 title: qsTr("Recently Added")
+                showNewTags: true
                 sideMargin: root.sideMargin
                 pageFlickable: flick
                 showSeeAll: model.maximumCount > model.count

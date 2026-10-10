@@ -293,6 +293,9 @@ FocusScope{
             Widgets.BannerCone {
                 id: logo
 
+                // flix: the back arrow is enough
+                visible: false
+
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.left: backBtn.right
                 anchors.leftMargin: VLCStyle.margin_xxsmall

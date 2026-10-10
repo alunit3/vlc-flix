@@ -52,6 +52,33 @@ Item {
 
             readonly property bool resuming: (model.progress ?? 0) > 0
 
+            property bool showInfo: false
+
+            // year / episode / resolution guessed from the file name
+            readonly property var info: MainCtx.releaseInfo(model.title ?? "")
+
+            readonly property string runtime: {
+                const d = model.duration
+                if (!d || !d.valid())
+                    return ""
+                const m = d.toMinutes()
+                if (m >= 60)
+                    return Math.floor(m / 60) + "h " + (m % 60) + "m"
+                return m >= 1 ? (m + "m") : (d.toSeconds() + "s")
+            }
+
+            // "Movie  •  2001  •  2h 13m  •  1080p"
+            readonly property string meta: {
+                const parts = [info.isEpisode ? qsTr("Series") : qsTr("Movie")]
+                if (info.year > 0)
+                    parts.push(String(info.year))
+                if (runtime !== "")
+                    parts.push(runtime)
+                if (info.resolution !== "")
+                    parts.push(info.resolution)
+                return parts.join("  •  ")
+            }
+
             width: view.width
             height: view.height
 
@@ -133,11 +160,14 @@ Item {
                 }
 
                 Text {
-                    visible: text !== ""
-                    text: slide.model.duration?.formatHMS() ?? ""
-                    color: "#B3B3B3"
+                    text: slide.meta
+                    color: "#E5E5E5"
                     font.pixelSize: VLCStyle.dp(15, VLCStyle.scale)
+                    font.weight: Font.DemiBold
                 }
+
+                Row {
+                    spacing: VLCStyle.dp(12, VLCStyle.scale)
 
                 Rectangle {
                     id: playButton
@@ -179,6 +209,59 @@ Item {
                             }
                         }
                     }
+                }
+
+                Rectangle {
+                    id: infoButton
+
+                    width: infoRow.implicitWidth + 2 * VLCStyle.dp(24, VLCStyle.scale)
+                    height: VLCStyle.dp(44, VLCStyle.scale)
+                    radius: VLCStyle.dp(4, VLCStyle.scale)
+                    color: infoHover.hovered ? Qt.rgba(0.43, 0.43, 0.45, 0.55) : Qt.rgba(0.43, 0.43, 0.45, 0.7)
+
+                    Row {
+                        id: infoRow
+
+                        anchors.centerIn: parent
+                        spacing: VLCStyle.dp(10, VLCStyle.scale)
+
+                        Text {
+                            text: "ⓘ"
+                            color: "#FFFFFF"
+                            font.pixelSize: VLCStyle.dp(20, VLCStyle.scale)
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        Text {
+                            text: qsTr("More Info")
+                            color: "#FFFFFF"
+                            font.pixelSize: VLCStyle.dp(18, VLCStyle.scale)
+                            font.weight: Font.Bold
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+
+                    HoverHandler { id: infoHover; cursorShape: Qt.PointingHandCursor }
+
+                    TapHandler {
+                        onTapped: slide.showInfo = !slide.showInfo
+                    }
+                }
+                }
+
+                // file details, shown by "More Info"
+                Text {
+                    visible: slide.showInfo
+                    width: parent.width
+                    text: qsTr("File: %1").arg(slide.model.title ?? "")
+                          + (slide.info.recognized ? "\n" + qsTr("Detected: %1").arg(slide.info.title
+                                                                                      + (slide.info.year > 0 ? " (" + slide.info.year + ")" : ""))
+                                                   : "")
+                    color: "#B3B3B3"
+                    font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
+                    wrapMode: Text.WrapAnywhere
+                    maximumLineCount: 3
+                    elide: Text.ElideRight
                 }
             }
         }

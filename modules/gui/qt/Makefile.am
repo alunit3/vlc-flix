@@ -1180,6 +1180,7 @@ libqml_module_player_a_QML = \
 	player/qml/LyricsFlickable.qml \
 	player/qml/MiniPlayer.qml \
 	player/qml/PIPPlayer.qml \
+	player/qml/FlixPauseOverlay.qml \
 	player/qml/Player.qml \
 	player/qml/PlayerControlLayout.qml \
 	player/qml/PlayerPlaylistVisibilityFSM.qml \
@@ -1211,6 +1212,7 @@ libqml_module_playercontrols_a_CPPFLAGS = $(libqt_plugin_la_CPPFLAGS)
 libqml_module_playercontrols_a_QML = \
 	player/qml/controlbarcontrols/HighResolutionTimeWidget.qml \
 	player/qml/controlbarcontrols/ArtworkInfoWidget.qml \
+	player/qml/controlbarcontrols/FlixTitleWidget.qml \
 	player/qml/controlbarcontrols/AspectRatioWidget.qml \
 	player/qml/controlbarcontrols/AtoBButton.qml \
 	player/qml/controlbarcontrols/BackButton.qml \

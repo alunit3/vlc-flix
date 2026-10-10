@@ -217,10 +217,10 @@ T.Control {
                 return VLCIcons.play_filled
         }
 
-        color: cursorInside ? theme.accent
-                            : "black"  //foreground is always black
+        // flix: plain white glyph on the bar (no ring)
+        color: cursorInside ? "#B3B3B3" : "#FFFFFF"
 
-        font.pixelSize: Math.round(parent.height / 1.7)
+        font.pixelSize: Math.round(parent.height / 1.1)
 
         font.family: VLCIcons.fontFamily
 
@@ -257,6 +257,9 @@ T.Control {
 
         Rectangle {
             anchors.fill: parent
+
+            // flix: the ring / disc is not drawn any more
+            visible: false
 
             radius: width / 2
 

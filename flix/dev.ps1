@@ -10,6 +10,14 @@ $src   = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $root  = Split-Path $src -Parent
 $run   = Join-Path $root "run"
 
+# Close any previous instance from the run tree (a stale window would otherwise be mistaken
+# for the new build, and it keeps the old plugin DLL open).
+Get-Process vlc -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } |
+    ForEach-Object { $_.CloseMainWindow() | Out-Null }
+Start-Sleep -Seconds 3
+Get-Process vlc -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } |
+    Stop-Process -Force -ErrorAction SilentlyContinue
+
 $script = @"
 set -e
 git config --global --add safe.directory /vlc

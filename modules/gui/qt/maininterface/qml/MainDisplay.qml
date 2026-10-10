@@ -276,6 +276,17 @@ FocusScope {
         navigationVisible: pannelVisiblity.showNavigation
         playqueueVisible: pannelVisiblity.showPlayqueue
 
+        // flix: top tabs replace the side navigation pane
+        onNavigationRequested: (uri) => {
+            if (stackView.isDefaulLoadedForPath([...uri]) ||
+                History.exactMatch(History.viewPath, uri)) {
+                stackView.positionContentAtBeginning()
+                return
+            }
+
+            History.push(uri)
+        }
+
         Navigation.parentItem: g_mainDisplay
         Navigation.upItem: menuTopbar
         Navigation.downItem: mainRow
@@ -568,7 +579,8 @@ FocusScope {
 
             delegateShowText: (state === "expanded")
 
-            visible: (width > 0.0)
+            // flix: always hidden, navigation is done through the top tabs
+            visible: false
 
             height: parent.height - g_mainDisplay.displayMargin
 

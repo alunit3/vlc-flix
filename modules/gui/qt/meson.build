@@ -635,6 +635,7 @@ qml_modules += {
     'target' : 'maininterface',
     'outdir' : 'VLC/MainInterface',
     'sources': files(
+        'maininterface/qml/FlixNavTabs.qml',
         'maininterface/qml/LocalTopbar.qml',
         'maininterface/qml/MenuTopbar.qml',
         'maininterface/qml/MainInterface.qml',

@@ -791,6 +791,10 @@ ui_%.h: %.ui
 
 libqt_plugin_la_RES = \
 	pixmaps/VLCIcons.ttf \
+	fonts/Inter-Regular.ttf \
+	fonts/Inter-Medium.ttf \
+	fonts/Inter-SemiBold.ttf \
+	fonts/Inter-Bold.ttf \
 	pixmaps/addons/addon_default.svg \
 	pixmaps/addons/addon_broken.svg \
 	pixmaps/addons/addon_blue.svg \
@@ -1057,6 +1061,7 @@ libqml_module_maininterface_a_CXXFLAGS = $(libqt_plugin_la_CXXFLAGS)
 libqml_module_maininterface_a_CPPFLAGS = $(libqt_plugin_la_CPPFLAGS)
 libqml_module_maininterface_a_QML = \
 	maininterface/qml/MenuTopbar.qml \
+	maininterface/qml/FlixNavTabs.qml \
 	maininterface/qml/LocalTopbar.qml \
 	maininterface/qml/MainInterface.qml \
 	maininterface/qml/MainViewLoader.qml \

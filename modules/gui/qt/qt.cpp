@@ -52,6 +52,7 @@ extern "C" char **environ;
 #endif
 
 #include <QApplication>
+#include <QFontDatabase>
 #include <QDate>
 #include <QMutex>
 #include <QtQuickControls2/QQuickStyle>
@@ -909,6 +910,15 @@ static void *Thread( void *obj )
     /* Start the QApplication here */
     QApplication app( argc, argv );
     app.setProperty("initialStyle", app.style()->name());
+
+    {
+        // flix: use the bundled Inter (SIL OFL) as the application font
+        for (const char *weight : { "Regular", "Medium", "SemiBold", "Bold" })
+            QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Inter-%1.ttf").arg(QLatin1String(weight)));
+        QFont font = app.font();
+        font.setFamily(QStringLiteral("Inter"));
+        app.setFont(font);
+    }
 
     {
         // Install custom translator:

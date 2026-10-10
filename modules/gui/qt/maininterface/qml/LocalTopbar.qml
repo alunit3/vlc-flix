@@ -67,10 +67,13 @@ T.ToolBar {
         colorSet: ColorContext.Window
     }
 
-    background:  Widgets.AcrylicBackground {
-        enabled: root.useAcrylic
-        tintColor: theme.bg.primary
+    // flix: solid black bar (was acrylic)
+    background: Rectangle {
+        color: "#000000"
     }
+
+    // flix: a top tab was clicked (uri of the NavigationModel entry)
+    signal navigationRequested(var uri)
 
     contentItem: Item {
 
@@ -104,6 +107,9 @@ T.ToolBar {
 
                 Widgets.IconToolButton {
                     id: navigationVisibilty
+
+                    // flix: the side navigation pane is replaced by the top tabs
+                    visible: false
 
                     focus: true
 
@@ -154,7 +160,30 @@ T.ToolBar {
                     sourceSize.height: VLCStyle.bannerButton_height
                     color: theme.accent
                 }
+
+                // flix: placeholder wordmark (rename before publishing)
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "FLIX"
+                    color: "#E50914"
+                    font.pixelSize: VLCStyle.dp(24, VLCStyle.scale)
+                    font.weight: Font.Black
+                    font.letterSpacing: VLCStyle.dp(1, VLCStyle.scale)
+                }
             }
+        }
+
+        // flix: top tabs
+        FlixNavTabs {
+            id: flixTabs
+
+            anchors {
+                left: navigationButtons.right
+                leftMargin: VLCStyle.margin_large
+                verticalCenter: parent.verticalCenter
+            }
+
+            onTabClicked: (uri) => root.navigationRequested(uri)
         }
 
         Item {

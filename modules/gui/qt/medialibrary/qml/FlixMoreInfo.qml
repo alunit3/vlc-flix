@@ -97,7 +97,8 @@ Item {
     readonly property real progress: (!isWeb && item) ? (item.progress ?? 0) : 0
     readonly property int totalSeconds: (!isWeb && item && item.duration && item.duration.valid())
                                         ? item.duration.toSeconds() : 0
-    readonly property int resumeSeconds: (progress > 0.03 && progress < 0.95 && totalSeconds > 0)
+    readonly property bool hasResume: progress > 0.03 && progress < 0.95
+    readonly property int resumeSeconds: (hasResume && totalSeconds > 0)
                                          ? Math.max(0, Math.round(progress * totalSeconds) - 5) : 0
 
     function _clock(seconds) {
@@ -110,9 +111,11 @@ Item {
     function play(fromStart) {
         if (isWeb || !item || item.id === undefined)
             return
-        const options = (!fromStart && resumeSeconds > 0) ? ["start-time=" + resumeSeconds] : []
-        MediaLib.addAndPlay(item.id, options)
-        MainCtx.resumeNotice = (!fromStart && resumeSeconds > 0) ? resumeSeconds : 0
+        // start normally and seek once it plays (start-time would shift the seek bar's zero)
+        MediaLib.addAndPlay(item.id)
+        // -1: start from the beginning even though the player would continue automatically
+        MainCtx.resumeFraction = (!fromStart && hasResume) ? progress : (progress > 0 ? -1 : 0)
+        MainCtx.resumeNotice = 0
         MainCtx.playerView = true
         close()
     }
@@ -265,7 +268,7 @@ Item {
 
             // progress of a started file
             Item {
-                visible: root.resumeSeconds > 0
+                visible: root.hasResume
                 width: parent.width
                 height: VLCStyle.dp(18, VLCStyle.scale)
 
@@ -289,7 +292,9 @@ Item {
 
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    text: qsTr("%1 left").arg(root._clock(Math.max(0, root.totalSeconds - root.resumeSeconds)))
+                    text: root.totalSeconds > 0
+                          ? qsTr("%1 left").arg(root._clock(Math.max(0, root.totalSeconds - root.resumeSeconds)))
+                          : qsTr("%1% watched").arg(Math.round(root.progress * 100))
                     color: "#B3B3B3"
                     font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
                 }
@@ -303,17 +308,20 @@ Item {
                     model: {
                         const list = []
                         if (!root.isWeb) {
-                            if (root.resumeSeconds > 0) {
+                            if (root.hasResume) {
                                 list.push({ kind: "play", primary: true,
-                                            label: "▶  " + qsTr("Resume from %1").arg(root._clock(root.resumeSeconds)) })
+                                            label: "▶  " + (root.resumeSeconds > 0 ? qsTr("Resume from %1").arg(root._clock(root.resumeSeconds))
+                                                                                  : qsTr("Resume")) })
                                 list.push({ kind: "restart", primary: false, label: qsTr("Play from beginning") })
                             } else {
                                 list.push({ kind: "play", primary: true, label: "▶  " + qsTr("Play") })
                             }
                         }
                         if (root.imdb !== "") {
-                            list.push({ kind: "imdb", primary: root.isWeb, label: qsTr("Open IMDb") })
-                            list.push({ kind: "torrents", primary: root.isWeb, label: qsTr("Open Heartive (torrents)") })
+                            if (root.isWeb)
+                                list.push({ kind: "stream", primary: true, label: "▶  " + qsTr("Stream") })
+                            list.push({ kind: "imdb", primary: false, label: qsTr("Open IMDb") })
+                            list.push({ kind: "torrents", primary: false, label: qsTr("Open Heartive (torrents)") })
                         }
                         return list
                     }
@@ -353,6 +361,12 @@ Item {
                                 switch (btn.modelData.kind) {
                                 case "play": root.play(false); break
                                 case "restart": root.play(true); break
+                                case "stream":
+                                    picker.open({ title: root.meta.title || root.rawTitle,
+                                                  year: root.meta.year ?? 0,
+                                                  imdbId: root.imdb,
+                                                  isTv: (root.item.mediaType ?? "movie") === "tv" })
+                                    break
                                 case "imdb": MainCtx.openExternal(MainCtx.imdbUrl(root.imdb)); break
                                 case "torrents": MainCtx.openExternal(MainCtx.topTenUrl(root.imdb)); break
                                 }
@@ -415,5 +429,14 @@ Item {
                 elide: Text.ElideMiddle
             }
         }
+    }
+
+    // torrent sources of an online title (opened by the Stream button)
+    FlixSourcePicker {
+        id: picker
+
+        anchors.fill: parent
+
+        onStreamStarted: root.close()
     }
 }

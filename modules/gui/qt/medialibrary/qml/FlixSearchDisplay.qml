@@ -92,11 +92,14 @@ Widgets.PageLoader {
             ]
             property string librarySort: "insertion"
 
-            readonly property var requestParams: ({
-                type: kind, query: query, sort: onlineSort,
-                genres: genreIds.join(","),
-                year_from: yearFrom, year_to: yearTo, min_rating: minRating
-            })
+            // a function, not a binding: it must see the new values inside the on...Changed handlers
+            function requestParams() {
+                return {
+                    type: kind, query: query, sort: onlineSort,
+                    genres: genreIds.join(","),
+                    year_from: yearFrom, year_to: yearTo, min_rating: minRating
+                }
+            }
 
             function reloadGenres() {
                 genreList = MainCtx.genres(kind)
@@ -112,7 +115,7 @@ Widgets.PageLoader {
             function fetch(pageNumber) {
                 if (!online)
                     return
-                const answer = MainCtx.discover(Object.assign({ page: pageNumber }, requestParams))
+                const answer = MainCtx.discover(Object.assign({ page: pageNumber }, requestParams()))
                 if (answer.ready) {
                     waiting = false
                     failed = false

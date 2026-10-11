@@ -75,7 +75,7 @@ Item {
     ParallelAnimation {
         id: appear
 
-        PauseAnimation { duration: Math.min(root.index, 10) * 40 }
+        PauseAnimation { duration: Math.max(0, Math.min(root.index, 10)) * 40 }
         ParallelAnimation {
             NumberAnimation { target: root; property: "opacity"; to: 1; duration: 320; easing.type: Easing.OutCubic }
             NumberAnimation { target: rise; property: "y"; to: 0; duration: 380; easing.type: Easing.OutCubic }

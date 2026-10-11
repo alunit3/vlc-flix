@@ -36,6 +36,46 @@ Rectangle {
         return (h > 0 ? h + ":" + String(m).padStart(2, "0") : String(m)) + ":" + String(s).padStart(2, "0")
     }
 
+    // the pending seek: done once, as soon as the video plays and can be sought
+    readonly property real pendingSeek: MainCtx.resumeFraction
+
+    // do not seek the title that was playing before the new one has taken over
+    property bool sawStop: false
+
+    function trySeek() {
+        if (!playing)
+            sawStop = true
+        if (pendingSeek === 0 || !sawStop || !playing || !Player.seekable)
+            return
+        if (pendingSeek < 0) {
+            // "play from beginning": undo the automatic continue of the player
+            Player.position = 0
+            MainCtx.resumeFraction = 0
+            return
+        }
+        const total = Player.length.toSeconds()
+        if (total <= 0)
+            return
+        // 5 seconds back from where the user stopped, as streaming services do
+        const target = Math.max(0, Math.min(0.99, pendingSeek - 5 / total))
+        Player.position = target
+        MainCtx.resumeFraction = 0
+        MainCtx.resumeNotice = Math.round(target * total)
+    }
+
+    onPendingSeekChanged: {
+        sawStop = !playing
+        trySeek()
+    }
+    onPlayingChanged: trySeek()
+
+    Connections {
+        target: Player
+
+        function onSeekableChanged() { root.trySeek() }
+        function onLengthChanged() { root.trySeek() }
+    }
+
     // starts counting down once the video really plays
     property bool armed: seconds > 0 && playing
 

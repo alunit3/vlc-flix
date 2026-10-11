@@ -146,6 +146,8 @@ class MainCtx : public QObject
     Q_PROPERTY(bool minimalView READ isMinimalView WRITE setMinimalView NOTIFY mainInterfaceModesChanged FINAL)
     // flix: seconds a title was just resumed from (0: nothing to announce), see FlixResumeToast
     Q_PROPERTY(int resumeNotice MEMBER m_resumeNotice NOTIFY resumeNoticeChanged FINAL)
+    // flix: position (0..1) to seek to once the title that was just started is playing; 0 = none
+    Q_PROPERTY(double resumeFraction MEMBER m_resumeFraction NOTIFY resumeFractionChanged FINAL)
     Q_PROPERTY(bool playerView READ isPlayerView WRITE setPlayerView NOTIFY mainInterfaceModesChanged FINAL)
 
     // This Property only works if hasAcrylicSurface is set
@@ -428,6 +430,14 @@ public:
     Q_INVOKABLE QVariantList topTen() const;
     // flix: true when a TMDB token is configured
     Q_INVOKABLE bool metaEnabled() const;
+    // flix: torrent sources / streaming through the flixtorrent helper (flix/torrent)
+    Q_INVOKABLE bool torrentAvailable() const;
+    Q_INVOKABLE void torrentSources(const QString &imdbId, int season, int episode);
+    Q_INVOKABLE void torrentStart(const QVariantMap &source);
+    Q_INVOKABLE void torrentCancel();
+    // small per-user preferences of the Flix UI (last quality / seeder filter...)
+    Q_INVOKABLE QVariant flixPref(const QString &key, const QVariant &fallback = QVariant()) const;
+    Q_INVOKABLE void setFlixPref(const QString &key, const QVariant &value);
     // flix: folder chooser for "Add movie folder"; an empty url when cancelled
     Q_INVOKABLE QUrl pickFolder(const QString &title) const;
 
@@ -549,6 +559,14 @@ protected:
     QVariantMap m_metaPending;
     QTimer *m_metaTimer = nullptr;
     int m_resumeNotice = 0;
+    double m_resumeFraction = 0.0;
+    class QProcess *m_sourcesProc = nullptr;
+    class QProcess *m_streamProc = nullptr;
+    QByteArray m_streamBuffer;
+    QString m_torrentError;
+    QString torrentHelper() const;
+    QString torrentDir() const;
+    void stopTorrent();
     void flushMetaRequests();
     void queueMeta(const QString &key, const QVariantMap &req);
 
@@ -665,6 +683,9 @@ signals:
 
     void mainInterfaceModesChanged(MainInterfaceModes);
     void resumeNoticeChanged(int);
+    void resumeFractionChanged(double);
+    void torrentSourcesReady(const QVariantList &items, const QString &error);
+    void torrentStatus(const QVariantMap &status);
 
     void usingTouchChanged();
 

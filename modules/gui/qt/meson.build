@@ -665,6 +665,7 @@ qml_modules += {
         'medialibrary/qml/FlixMoreInfo.qml',
         'medialibrary/qml/FlixRow.qml',
         'medialibrary/qml/FlixSearchDisplay.qml',
+        'medialibrary/qml/FlixSourcePicker.qml',
         'medialibrary/qml/FlixTopTen.qml',
         'medialibrary/qml/HomeDisplay.qml',
         'medialibrary/qml/HomePage.qml',

@@ -25,3 +25,10 @@ This fork of VLC (GPL-2.0-or-later) includes work derived from other projects.
 ## Trademarks
 - "VLC" and the traffic cone are trademarks of VideoLAN. Rename and re-brand before publishing builds.
 - No Netflix logo, name or fonts are used.
+
+## Torrent streaming
+- `flix/torrent` (Go) uses **anacrolix/torrent** (MPL-2.0, https://github.com/anacrolix/torrent) to stream a torrent
+  to the player over http://127.0.0.1. Peers see the IP address of the machine; use a VPN if that matters.
+- Sources are looked up from the public Stremio addons that the Heartive torrents page uses
+  (Torrentio, Comet, StremThru, PirateBay+) and the ngosang/trackerslist tracker list. Nothing is searched or
+  downloaded until the user picks a source and presses Stream. You are responsible for what you stream.

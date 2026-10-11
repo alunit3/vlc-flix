@@ -1911,7 +1911,7 @@ vlc_module_begin ()
 
     add_bool( "save-recentplay", true, SAVE_RECENTPLAY, NULL )
 
-    add_integer( "restore-playback-pos", VLC_PLAYER_RESTORE_PLAYBACK_POS_ASK,
+    add_integer( "restore-playback-pos", VLC_PLAYER_RESTORE_PLAYBACK_POS_ALWAYS,
                  RESTORE_PLAYBACK_POS_TEXT, RESTORE_PLAYBACK_POS_LONGTEXT )
         change_integer_list( pi_restore_playback_values, ppsz_restore_playback_desc )
 

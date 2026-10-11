@@ -73,6 +73,13 @@ foreach ($rel in @("intf/flixsubs.lua", "modules/flix_opensubtitles.lua", "modul
     Copy-Item (Join-Path $src ("share/lua/" + $rel)) $to -Force
 }
 
+# the torrent helper (Go): rebuilt when its sources are newer than the installed exe
+$helper = Join-Path $run "flix\flixtorrent.exe"
+$newest = Get-ChildItem (Join-Path $PSScriptRoot "torrent") -Include *.go,go.mod -Recurse | Sort-Object LastWriteTime | Select-Object -Last 1
+if ((Get-Command go -ErrorAction SilentlyContinue) -and ((-not (Test-Path $helper)) -or ($newest.LastWriteTime -gt (Get-Item $helper).LastWriteTime))) {
+    & (Join-Path $PSScriptRoot "build-torrent.ps1")
+}
+
 if ($Launch) {
     New-Item -ItemType Directory -Force (Join-Path $run "portable") | Out-Null
     $a = @("-I", "qt", "--no-one-instance", "--no-qt-privacy-ask", "--no-qt-updates-notif")

@@ -89,6 +89,9 @@
 #include <QDesktopServices>
 #include <QDateTime>
 #include <QFileDialog>
+#include <QProcess>
+#include <QCoreApplication>
+#include <QSettings>
 #include <QRegularExpression>
 #endif
 
@@ -325,6 +328,12 @@ MainCtx::MainCtx(qt_intf_t *_p_intf)
 
 MainCtx::~MainCtx()
 {
+    stopTorrent();
+    if( m_sourcesProc )
+    {
+        m_sourcesProc->kill();
+        m_sourcesProc->waitForFinished( 500 );
+    }
     /* Save states */
 
     m_threadRunner->destroy();
@@ -756,6 +765,207 @@ static QVariantMap metaRecordToMap( const QJsonObject &o, const QString &directo
 QUrl MainCtx::pickFolder(const QString &title) const
 {
     return QFileDialog::getExistingDirectoryUrl( nullptr, title, QUrl() );
+}
+
+QString MainCtx::torrentHelper() const
+{
+#ifdef _WIN32
+    const QString name = QStringLiteral("flixtorrent.exe");
+#else
+    const QString name = QStringLiteral("flixtorrent");
+#endif
+    return QCoreApplication::applicationDirPath() + QStringLiteral("/flix/") + name;
+}
+
+QString MainCtx::torrentDir() const
+{
+    char *dir = config_GetUserDir( VLC_USERDATA_DIR );
+    if( dir == nullptr )
+        return QString();
+    const QString path = QDir::fromNativeSeparators( qfu( dir ) ) + QStringLiteral("/flix-torrents");
+    free( dir );
+    return path;
+}
+
+bool MainCtx::torrentAvailable() const
+{
+    return QFileInfo::exists( torrentHelper() );
+}
+
+void MainCtx::torrentSources(const QString &imdbId, int season, int episode)
+{
+    static const QRegularExpression imdbRe( QStringLiteral("^tt\\d{5,10}$") );
+    if( !imdbRe.match( imdbId ).hasMatch() )
+    {
+        emit torrentSourcesReady( {}, tr("This title has no IMDb id yet.") );
+        return;
+    }
+    if( !torrentAvailable() )
+    {
+        emit torrentSourcesReady( {}, tr("The torrent helper is not installed (run flix/build-torrent.ps1).") );
+        return;
+    }
+    if( m_sourcesProc )
+    {
+        // a newer request replaces the running one
+        m_sourcesProc->disconnect( this );
+        m_sourcesProc->kill();
+        m_sourcesProc->deleteLater();
+    }
+    m_sourcesProc = new QProcess( this );
+    QProcess *proc = m_sourcesProc;
+    QStringList args { QStringLiteral("sources"), QStringLiteral("--imdb"), imdbId,
+                       QStringLiteral("--cache"), torrentDir() + QStringLiteral("/cache") };
+    if( season > 0 && episode > 0 )
+        args << QStringLiteral("--season") << QString::number( season )
+             << QStringLiteral("--episode") << QString::number( episode );
+
+    connect( proc, &QProcess::finished, this, [this, proc]( int code, QProcess::ExitStatus ) {
+        const QByteArray out = proc->readAllStandardOutput();
+        if( m_sourcesProc == proc )
+            m_sourcesProc = nullptr;
+        proc->deleteLater();
+        const QJsonObject o = QJsonDocument::fromJson( out ).object();
+        if( code != 0 || o.isEmpty() )
+        {
+            emit torrentSourcesReady( {}, o.value( QStringLiteral("error") ).toString( tr("Could not load sources.") ) );
+            return;
+        }
+        emit torrentSourcesReady( o.value( QStringLiteral("sources") ).toArray().toVariantList(), QString() );
+    } );
+    connect( proc, &QProcess::errorOccurred, this, [this, proc]( QProcess::ProcessError e ) {
+        if( e != QProcess::FailedToStart )
+            return;
+        if( m_sourcesProc == proc )
+            m_sourcesProc = nullptr;
+        proc->deleteLater();
+        emit torrentSourcesReady( {}, tr("Could not start the torrent helper.") );
+    } );
+    proc->start( torrentHelper(), args );
+}
+
+void MainCtx::stopTorrent()
+{
+    if( !m_streamProc )
+        return;
+    msg_Dbg( p_intf, "flixtorrent: stopping the stream helper" );
+    QProcess *proc = m_streamProc;
+    m_streamProc = nullptr;
+    proc->disconnect( this );
+    // closing stdin tells the helper to quit and clean up; kill it if it does not
+    proc->closeWriteChannel();
+    proc->terminate();
+    if( !proc->waitForFinished( 800 ) )
+    {
+        proc->kill();
+        proc->waitForFinished( 1000 );
+    }
+    proc->deleteLater();
+}
+
+void MainCtx::torrentCancel()
+{
+    stopTorrent();
+    QVariantMap status;
+    status.insert( QStringLiteral("state"), QStringLiteral("cancelled") );
+    emit torrentStatus( status );
+}
+
+void MainCtx::torrentStart(const QVariantMap &source)
+{
+    static const QRegularExpression magnetRe( QStringLiteral("^magnet:\\?xt=urn:btih:[0-9a-fA-F]{40}(&.*)?$") );
+    const QString magnet = source.value( QStringLiteral("magnet") ).toString();
+    QVariantMap status;
+    if( !magnetRe.match( magnet ).hasMatch() || !torrentAvailable() )
+    {
+        status.insert( QStringLiteral("state"), QStringLiteral("error") );
+        status.insert( QStringLiteral("message"), tr("This source cannot be streamed.") );
+        emit torrentStatus( status );
+        return;
+    }
+    stopTorrent();
+    m_streamBuffer.clear();
+
+    const int fileIdx = source.value( QStringLiteral("fileIdx"), -1 ).toInt();
+    const QString dataDir = torrentDir() + QStringLiteral("/data-")
+                          + QString::number( QDateTime::currentSecsSinceEpoch() );
+    m_streamProc = new QProcess( this );
+    QProcess *proc = m_streamProc;
+
+    connect( proc, &QProcess::readyReadStandardError, this, [this, proc]() {
+        msg_Dbg( p_intf, "flixtorrent stderr: %s", proc->readAllStandardError().constData() );
+    } );
+    connect( proc, &QProcess::readyReadStandardOutput, this, [this, proc]() {
+        m_streamBuffer += proc->readAllStandardOutput();
+        int nl;
+        while( ( nl = m_streamBuffer.indexOf( '\n' ) ) >= 0 )
+        {
+            const QByteArray line = m_streamBuffer.left( nl );
+            m_streamBuffer.remove( 0, nl + 1 );
+            const QJsonObject o = QJsonDocument::fromJson( line ).object();
+            if( o.isEmpty() )
+                continue;
+            QVariantMap st = o.toVariantMap();
+            st.insert( QStringLiteral("state"), o.value( QStringLiteral("event") ).toString() );
+            if( st.value( QStringLiteral("state") ).toString() == QLatin1String("ready") )
+            {
+                // only ever play what our own helper serves on this machine
+                const QUrl url( st.value( QStringLiteral("url") ).toString() );
+                if( url.scheme() != QLatin1String("http") || url.host() != QLatin1String("127.0.0.1") )
+                    continue;
+            }
+            emit torrentStatus( st );
+        }
+    } );
+    connect( proc, &QProcess::finished, this, [this, proc]( int code, QProcess::ExitStatus ) {
+        const QByteArray err = proc->readAllStandardError().trimmed();
+        msg_Dbg( p_intf, "flixtorrent stream helper ended: code %d %s", code, err.constData() );
+        if( m_streamProc != proc )
+            return;
+        m_streamProc = nullptr;
+        proc->deleteLater();
+        if( code != 0 )
+        {
+            QVariantMap st;
+            st.insert( QStringLiteral("state"), QStringLiteral("error") );
+            st.insert( QStringLiteral("message"), tr("The torrent helper stopped unexpectedly.") );
+            emit torrentStatus( st );
+        }
+    } );
+    connect( proc, &QProcess::errorOccurred, this, [this, proc]( QProcess::ProcessError e ) {
+        if( e != QProcess::FailedToStart || m_streamProc != proc )
+            return;
+        m_streamProc = nullptr;
+        proc->deleteLater();
+        QVariantMap st;
+        st.insert( QStringLiteral("state"), QStringLiteral("error") );
+        st.insert( QStringLiteral("message"), tr("Could not start the torrent helper.") );
+        emit torrentStatus( st );
+    } );
+
+    // leftovers of earlier sessions (a killed helper cannot clean up after itself)
+    const QDir base( torrentDir() );
+    for( const QString &old : base.entryList( { QStringLiteral("data-*") }, QDir::Dirs | QDir::NoDotAndDotDot ) )
+        QDir( base.filePath( old ) ).removeRecursively();
+
+    QStringList args { QStringLiteral("stream"), QStringLiteral("--magnet"), magnet,
+                       QStringLiteral("--data-dir"), dataDir,
+                       QStringLiteral("--parent-pid"), QString::number( QCoreApplication::applicationPid() ) };
+    if( fileIdx >= 0 )
+        args << QStringLiteral("--file-idx") << QString::number( fileIdx );
+    proc->start( torrentHelper(), args );
+}
+
+QVariant MainCtx::flixPref(const QString &key, const QVariant &fallback) const
+{
+    QSettings settings( torrentDir() + QStringLiteral("/../flix-prefs.ini"), QSettings::IniFormat );
+    return settings.value( key, fallback );
+}
+
+void MainCtx::setFlixPref(const QString &key, const QVariant &value)
+{
+    QSettings settings( torrentDir() + QStringLiteral("/../flix-prefs.ini"), QSettings::IniFormat );
+    settings.setValue( key, value );
 }
 
 bool MainCtx::metaEnabled() const

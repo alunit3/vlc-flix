@@ -611,6 +611,7 @@ protected:
 
 public slots:
     void toggleToolbarMenu();
+    QStringList rateArgs() const;
     void toggleInterfaceFullScreen();
     void setPlayerPlaylistWidth( double factor );
     void setInterfaceAlwaysOnTop( bool );

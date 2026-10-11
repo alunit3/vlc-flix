@@ -49,8 +49,11 @@ func main() {
 		dataDir := fs.String("data-dir", "", "download directory")
 		keep := fs.Bool("keep", false, "keep downloaded data on exit")
 		parent := fs.Int("parent-pid", 0, "exit when this process ends (default: when stdin closes)")
+		startFrac := fs.Float64("start-fraction", 0, "position (0..1) the player will seek to: that part is buffered before the stream is announced")
+		rateLimit := fs.Int64("rate-limit", 0, "download speed limit in bytes/s (0: unlimited)")
+		uploadLimit := fs.Int64("upload-rate-limit", 0, "upload speed limit in bytes/s (0: unlimited)")
 		fs.Parse(os.Args[2:])
-		os.Exit(runStream(*magnet, *torrentFile, *fileIdx, *dataDir, *keep, *parent))
+		os.Exit(runStream(*magnet, *torrentFile, *fileIdx, *dataDir, *keep, *parent, *startFrac, *rateLimit, *uploadLimit))
 	case "files":
 		fs := flag.NewFlagSet("files", flag.ExitOnError)
 		fs.StringVar(&trackersFile, "trackers-file", "", "text file with extra trackers (one per line)")

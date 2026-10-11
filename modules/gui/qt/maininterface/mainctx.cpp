@@ -1238,6 +1238,19 @@ bool MainCtx::clearStorage(const QString &kind)
         if( m_webProc )
             return false;
         return QDir( userFile( QStringLiteral("flix-web") ) ).removeRecursively();
+// speed caps in bytes/s; 0 (or unset) means unlimited, and then the flag is left out
+QStringList MainCtx::rateArgs() const
+{
+    QStringList args;
+    const qint64 down = flixPref( QStringLiteral("torrent/rateDown"), 0 ).toLongLong();
+    if( down > 0 )
+        args << QStringLiteral("--rate-limit") << QString::number( down );
+    const qint64 up = flixPref( QStringLiteral("torrent/rateUp"), 0 ).toLongLong();
+    if( up > 0 )
+        args << QStringLiteral("--upload-rate-limit") << QString::number( up );
+    return args;
+}
+
     }
     if( kind == QLatin1String("resume") )
     {
@@ -1566,6 +1579,7 @@ QVariantMap MainCtx::meta(const QString &name)
         }
         m_metaTimer->start( 300 );
     }
+    args << rateArgs();
     return {};
 }
 

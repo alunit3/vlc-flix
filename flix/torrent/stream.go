@@ -14,6 +14,7 @@ import (
 
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/types"
+	"golang.org/x/time/rate"
 )
 
 var reMagnet = regexp.MustCompile(`^magnet:\?xt=urn:btih:([0-9a-fA-F]{40}|[A-Za-z2-7]{32})(&.*)?$`)
@@ -26,6 +27,9 @@ var videoExt = map[string]bool{
 const (
 	headBytes = 12 << 20 // buffered before playback starts
 	tailBytes = 3 << 20  // mp4 moov / mkv cues often live at the end
+	// smallest token bucket we hand to a limiter: the socket buffer size the torrent
+	// library assumes, so even a small cap refills in chunks worth sending
+	minRateBurst = 1 << 20
 )
 
 func fail(msg string) int {
@@ -54,7 +58,7 @@ func piecesComplete(t *torrent.Torrent, begin, end int) (done, total int) {
 	return
 }
 
-func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep bool, parentPid int) int {
+func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep bool, parentPid int, startFrac float64, rateLimit, uploadLimit int64) int {
 	if torrentFile == "" && !reMagnet.MatchString(magnet) {
 		return fail("bad magnet link")
 	}
@@ -69,6 +73,13 @@ func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep boo
 	cfg.DataDir = dataDir
 	cfg.ListenPort = 0
 	cfg.Seed = false
+	// speed caps from the player settings (bytes/s); 0 keeps the library default
+	if rateLimit > 0 {
+		cfg.DownloadRateLimiter = rate.NewLimiter(rate.Limit(rateLimit), int(max(rateLimit, minRateBurst)))
+	}
+	if uploadLimit > 0 {
+		cfg.UploadRateLimiter = rate.NewLimiter(rate.Limit(uploadLimit), int(max(uploadLimit, minRateBurst)))
+	}
 	client, err := torrent.NewClient(cfg)
 	if err != nil {
 		return fail("cannot start torrent client: " + err.Error())
@@ -158,6 +169,23 @@ func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep boo
 	for i := tb; i <= te; i++ {
 		t.Piece(i).SetPriority(types.PiecePriorityHigh)
 	}
+	// resuming: the player will seek to startFrac right away, so that part must be in before "ready"
+	// (otherwise the seek waits for the download and the seek bar stays at the start)
+	sb, se := -1, -2
+	if startFrac > 0.01 && startFrac < 0.99 {
+		off := int64(float64(length) * startFrac)
+		if off -= int64(headBytes) / 4; off < 0 {
+			off = 0
+		}
+		end := off + int64(headBytes)
+		if end > length {
+			end = length
+		}
+		sb, se = pieceRange(t, file, off, end)
+		for i := sb; i <= se; i++ {
+			t.Piece(i).SetPriority(types.PiecePriorityHigh)
+		}
+	}
 
 	// local HTTP server (range requests => seeking)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -197,6 +225,11 @@ func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep boo
 		td, tt := piecesComplete(t, tb, te)
 		have := hd + td
 		need := ht + tt
+		if se >= sb {
+			sd, st := piecesComplete(t, sb, se)
+			have += sd
+			need += st
+		}
 		pct := 100
 		if need > 0 {
 			pct = have * 100 / need

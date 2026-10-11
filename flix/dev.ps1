@@ -80,6 +80,13 @@ if ((Get-Command go -ErrorAction SilentlyContinue) -and ((-not (Test-Path $helpe
     & (Join-Path $PSScriptRoot "build-torrent.ps1")
 }
 
+# the web player helper (Go + Edge WebView2), same rule
+$webHelper = Join-Path $run "flix\flixweb.exe"
+$webNewest = Get-ChildItem (Join-Path $PSScriptRoot "web") -Include *.go,go.mod -Recurse | Sort-Object LastWriteTime | Select-Object -Last 1
+if ((Get-Command go -ErrorAction SilentlyContinue) -and ((-not (Test-Path $webHelper)) -or ($webNewest.LastWriteTime -gt (Get-Item $webHelper).LastWriteTime))) {
+    & (Join-Path $PSScriptRoot "build-web.ps1")
+}
+
 if ($Launch) {
     New-Item -ItemType Directory -Force (Join-Path $run "portable") | Out-Null
     $a = @("-I", "qt", "--no-one-instance", "--no-qt-privacy-ask", "--no-qt-updates-notif")

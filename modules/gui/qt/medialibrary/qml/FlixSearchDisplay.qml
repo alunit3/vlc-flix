@@ -193,6 +193,12 @@ Widgets.PageLoader {
                 anchors.fill: parent
             }
 
+            FlixMagnetDialog {
+                id: magnetDialog
+
+                anchors.fill: parent
+            }
+
             Rectangle {
                 anchors.fill: parent
                 color: "#141414"
@@ -321,6 +327,10 @@ Widgets.PageLoader {
                             text: qsTr("My library")
                             selected: !page.online
                             onClicked: page.online = false
+                        }
+                        Chip {
+                            text: "＋ " + qsTr("Magnet link")
+                            onClicked: magnetDialog.open()
                         }
                     }
 

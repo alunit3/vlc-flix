@@ -329,6 +329,16 @@ MainCtx::MainCtx(qt_intf_t *_p_intf)
 MainCtx::~MainCtx()
 {
     stopTorrent();
+    if( m_webProc )
+    {
+        m_webProc->kill();
+        m_webProc->waitForFinished( 500 );
+    }
+    if( m_filesProc )
+    {
+        m_filesProc->kill();
+        m_filesProc->waitForFinished( 500 );
+    }
     if( m_sourcesProc )
     {
         m_sourcesProc->kill();
@@ -787,6 +797,167 @@ QString MainCtx::torrentDir() const
     return path;
 }
 
+QString MainCtx::clipboardMagnet() const
+{
+    static const QRegularExpression magnetRe( QStringLiteral("^magnet:\\?xt=urn:btih:([0-9a-fA-F]{40}|[A-Za-z2-7]{32})(&.*)?$") );
+    const QString text = QGuiApplication::clipboard()->text().trimmed();
+    return magnetRe.match( text ).hasMatch() ? text : QString();
+}
+
+QString MainCtx::pickTorrentFile(const QString &title) const
+{
+    return QFileDialog::getOpenFileName( nullptr, title, QString(), QStringLiteral("Torrent files (*.torrent)") );
+}
+
+void MainCtx::torrentFiles(const QVariantMap &source)
+{
+    static const QRegularExpression magnetRe( QStringLiteral("^magnet:\\?xt=urn:btih:([0-9a-fA-F]{40}|[A-Za-z2-7]{32})(&.*)?$") );
+    const QString magnet = source.value( QStringLiteral("magnet") ).toString().trimmed();
+    const QString torrentFile = source.value( QStringLiteral("torrentFile") ).toString();
+    const bool valid = torrentFile.isEmpty() ? magnetRe.match( magnet ).hasMatch()
+                                             : ( torrentFile.endsWith( QLatin1String(".torrent"), Qt::CaseInsensitive )
+                                                 && QFileInfo::exists( torrentFile ) );
+    if( !valid )
+    {
+        emit torrentFilesReady( QString(), {}, tr("That is not a magnet link or a .torrent file.") );
+        return;
+    }
+    if( !torrentAvailable() )
+    {
+        emit torrentFilesReady( QString(), {}, tr("The torrent helper is not installed (run flix/build-torrent.ps1).") );
+        return;
+    }
+    if( m_filesProc )
+    {
+        m_filesProc->disconnect( this );
+        m_filesProc->kill();
+        m_filesProc->deleteLater();
+    }
+    m_filesProc = new QProcess( this );
+    QProcess *proc = m_filesProc;
+    connect( proc, &QProcess::finished, this, [this, proc]( int code, QProcess::ExitStatus ) {
+        const QByteArray out = proc->readAllStandardOutput();
+        if( m_filesProc == proc )
+            m_filesProc = nullptr;
+        proc->deleteLater();
+        const QJsonObject o = QJsonDocument::fromJson( out ).object();
+        if( code != 0 || o.contains( QStringLiteral("error") ) || o.isEmpty() )
+        {
+            emit torrentFilesReady( QString(), {}, o.value( QStringLiteral("error") ).toString( tr("Could not read the torrent.") ) );
+            return;
+        }
+        emit torrentFilesReady( o.value( QStringLiteral("name") ).toString(),
+                                o.value( QStringLiteral("files") ).toArray().toVariantList(), QString() );
+    } );
+    connect( proc, &QProcess::errorOccurred, this, [this, proc]( QProcess::ProcessError e ) {
+        if( e != QProcess::FailedToStart )
+            return;
+        if( m_filesProc == proc )
+            m_filesProc = nullptr;
+        proc->deleteLater();
+        emit torrentFilesReady( QString(), {}, tr("Could not start the torrent helper.") );
+    } );
+    QStringList args { QStringLiteral("files"),
+                       torrentFile.isEmpty() ? QStringLiteral("--magnet") : QStringLiteral("--torrent-file"),
+                       torrentFile.isEmpty() ? magnet : torrentFile,
+                       QStringLiteral("--data-dir"),
+                       torrentDir() + QStringLiteral("/files-") + QString::number( QDateTime::currentSecsSinceEpoch() ) };
+    proc->start( torrentHelper(), args );
+}
+
+// --- web player -----------------------------------------------------------------------
+
+static const char *const defaultProviders = R"JSON([
+  {"name": "VidLink",     "host": "vidlink.pro",       "movie": "https://vidlink.pro/movie/{tmdb}",       "tv": "https://vidlink.pro/tv/{tmdb}/{season}/{episode}"},
+  {"name": "VixSrc",      "host": "vixsrc.to",         "movie": "https://vixsrc.to/movie/{tmdb}",         "tv": "https://vixsrc.to/tv/{tmdb}/{season}/{episode}"},
+  {"name": "VidFast",     "host": "vidfast.vc",        "movie": "https://vidfast.vc/movie/{tmdb}",        "tv": "https://vidfast.vc/tv/{tmdb}/{season}/{episode}"},
+  {"name": "VidZee",      "host": "vidzee.wtf",        "movie": "https://vidzee.wtf/movie/{tmdb}",        "tv": "https://vidzee.wtf/tv/{tmdb}/{season}/{episode}"},
+  {"name": "VidNest",     "host": "vidnest.fun",       "movie": "https://vidnest.fun/movie/{tmdb}",       "tv": "https://vidnest.fun/tv/{tmdb}/{season}/{episode}"},
+  {"name": "CineSrc",     "host": "cinesrc.st",        "movie": "https://cinesrc.st/embed/movie/{tmdb}",  "tv": "https://cinesrc.st/embed/tv/{tmdb}?s={season}&e={episode}"},
+  {"name": "Atlantic",    "host": "atlantic.st",       "movie": "https://atlantic.st/movie/{tmdb}",       "tv": "https://atlantic.st/tv/{tmdb}/{season}/{episode}"},
+  {"name": "VidRift",     "host": "vidrift.net",       "movie": "https://vidrift.net/?tmdb={tmdb}",        "tv": "https://vidrift.net/?tmdb={tmdb}&s={season}&e={episode}"},
+  {"name": "VidStuck",    "host": "vidstuck.xyz",      "movie": "https://vidstuck.xyz/embed/movie/{tmdb}", "tv": "https://vidstuck.xyz/embed/tv/{tmdb}/{season}/{episode}"},
+  {"name": "Vidy",        "host": "www.vidy.st",       "movie": "https://www.vidy.st/movie/{tmdb}",       "tv": "https://www.vidy.st/tv/{tmdb}/{season}/{episode}"},
+  {"name": "SuperEmbed",  "host": "superembed.stream", "movie": "https://superembed.stream/?tmdb={tmdb}",  "tv": "https://superembed.stream/?tmdb={tmdb}&s={season}&e={episode}"},
+  {"name": "PrimeWire",   "host": "primewire.mov",     "movie": "https://primewire.mov/movie/{tmdb}",     "tv": "https://primewire.mov/tv/{tmdb}/{season}/{episode}"}
+])JSON";
+
+QVariantList MainCtx::webProviders()
+{
+    // user-editable: written once, then read every time so URL patterns can be corrected
+    const QString path = torrentDir() + QStringLiteral("/../flix-providers.json");
+    if( !QFileInfo::exists( path ) )
+    {
+        QFile out( path );
+        if( out.open( QIODevice::WriteOnly ) )
+            out.write( defaultProviders );
+    }
+    QFile file( path );
+    QByteArray raw = defaultProviders;
+    if( file.open( QIODevice::ReadOnly ) )
+        raw = file.readAll();
+    QJsonArray list = QJsonDocument::fromJson( raw ).array();
+    if( list.isEmpty() )
+        list = QJsonDocument::fromJson( defaultProviders ).array();
+    QVariantList result;
+    for( const QJsonValue &v : std::as_const( list ) )
+    {
+        const QJsonObject o = v.toObject();
+        // only https pages on the provider's own host are ever opened
+        const QString host = o.value( QStringLiteral("host") ).toString();
+        if( host.isEmpty() )
+            continue;
+        QVariantMap m = o.toVariantMap();
+        result.append( m );
+    }
+    return result;
+}
+
+bool MainCtx::webPlayerAvailable() const
+{
+#ifdef _WIN32
+    return QFileInfo::exists( QCoreApplication::applicationDirPath() + QStringLiteral("/flix/flixweb.exe") );
+#else
+    return false;
+#endif
+}
+
+void MainCtx::openWebPlayer(const QUrl &url, const QString &title)
+{
+    if( url.scheme() != QLatin1String("https") || url.host().isEmpty() )
+        return;
+    if( !webPlayerAvailable() )
+    {
+        // no WebView2 helper: the default browser does the job
+        QDesktopServices::openUrl( url );
+        return;
+    }
+    if( m_webProc )
+    {
+        m_webProc->disconnect( this );
+        m_webProc->kill();
+        m_webProc->deleteLater();
+    }
+    m_webProc = new QProcess( this );
+    QProcess *proc = m_webProc;
+    connect( proc, &QProcess::finished, this, [this, proc]( int code, QProcess::ExitStatus ) {
+        const QByteArray err = proc->readAllStandardError().trimmed();
+        msg_Dbg( p_intf, "flixweb ended: code %d %s", code, err.constData() );
+        if( m_webProc == proc )
+            m_webProc = nullptr;
+        // WebView2 missing or failed to start: fall back to the browser
+        if( code == 3 )
+            QDesktopServices::openUrl( proc->property( "flixUrl" ).toUrl() );
+        proc->deleteLater();
+    } );
+    proc->setProperty( "flixUrl", url );
+    proc->start( QCoreApplication::applicationDirPath() + QStringLiteral("/flix/flixweb.exe"),
+                 { QStringLiteral("--url"), url.toString( QUrl::FullyEncoded ),
+                   QStringLiteral("--title"), title,
+                   QStringLiteral("--data-dir"), torrentDir() + QStringLiteral("/../flix-web"),
+                   QStringLiteral("--parent-pid"), QString::number( QCoreApplication::applicationPid() ) } );
+}
+
 bool MainCtx::torrentAvailable() const
 {
     return QFileInfo::exists( torrentHelper() );
@@ -849,6 +1020,11 @@ void MainCtx::stopTorrent()
     if( !m_streamProc )
         return;
     msg_Dbg( p_intf, "flixtorrent: stopping the stream helper" );
+    if( !m_torrentStats.isEmpty() )
+    {
+        m_torrentStats.clear();
+        emit torrentStatsChanged();
+    }
     QProcess *proc = m_streamProc;
     m_streamProc = nullptr;
     proc->disconnect( this );
@@ -873,10 +1049,14 @@ void MainCtx::torrentCancel()
 
 void MainCtx::torrentStart(const QVariantMap &source)
 {
-    static const QRegularExpression magnetRe( QStringLiteral("^magnet:\\?xt=urn:btih:[0-9a-fA-F]{40}(&.*)?$") );
+    static const QRegularExpression magnetRe( QStringLiteral("^magnet:\\?xt=urn:btih:([0-9a-fA-F]{40}|[A-Za-z2-7]{32})(&.*)?$") );
     const QString magnet = source.value( QStringLiteral("magnet") ).toString();
+    const QString torrentFile = source.value( QStringLiteral("torrentFile") ).toString();
     QVariantMap status;
-    if( !magnetRe.match( magnet ).hasMatch() || !torrentAvailable() )
+    const bool validSource = torrentFile.isEmpty() ? magnetRe.match( magnet ).hasMatch()
+                                                   : ( torrentFile.endsWith( QLatin1String(".torrent"), Qt::CaseInsensitive )
+                                                       && QFileInfo::exists( torrentFile ) );
+    if( !validSource || !torrentAvailable() )
     {
         status.insert( QStringLiteral("state"), QStringLiteral("error") );
         status.insert( QStringLiteral("message"), tr("This source cannot be streamed.") );
@@ -907,6 +1087,11 @@ void MainCtx::torrentStart(const QVariantMap &source)
                 continue;
             QVariantMap st = o.toVariantMap();
             st.insert( QStringLiteral("state"), o.value( QStringLiteral("event") ).toString() );
+            if( st.value( QStringLiteral("state") ).toString() == QLatin1String("progress") )
+            {
+                m_torrentStats = st;
+                emit torrentStatsChanged();
+            }
             if( st.value( QStringLiteral("state") ).toString() == QLatin1String("ready") )
             {
                 // only ever play what our own helper serves on this machine
@@ -948,7 +1133,9 @@ void MainCtx::torrentStart(const QVariantMap &source)
     for( const QString &old : base.entryList( { QStringLiteral("data-*") }, QDir::Dirs | QDir::NoDotAndDotDot ) )
         QDir( base.filePath( old ) ).removeRecursively();
 
-    QStringList args { QStringLiteral("stream"), QStringLiteral("--magnet"), magnet,
+    QStringList args { QStringLiteral("stream"),
+                       torrentFile.isEmpty() ? QStringLiteral("--magnet") : QStringLiteral("--torrent-file"),
+                       torrentFile.isEmpty() ? magnet : torrentFile,
                        QStringLiteral("--data-dir"), dataDir,
                        QStringLiteral("--parent-pid"), QString::number( QCoreApplication::applicationPid() ) };
     if( fileIdx >= 0 )

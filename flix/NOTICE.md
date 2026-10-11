@@ -32,3 +32,9 @@ This fork of VLC (GPL-2.0-or-later) includes work derived from other projects.
 - Sources are looked up from the public Stremio addons that the Heartive torrents page uses
   (Torrentio, Comet, StremThru, PirateBay+) and the ngosang/trackerslist tracker list. Nothing is searched or
   downloaded until the user picks a source and presses Stream. You are responsible for what you stream.
+
+## Web player
+- `flix/web` (Go) hosts a **Microsoft Edge WebView2** window (https://github.com/jchv/go-webview2, MIT) that shows the
+  web player of a streaming provider chosen in "Watch online". It needs the WebView2 runtime (part of Windows 11 / Edge).
+  The provider list is `flix-providers.json` in the user data folder and can be edited. The player only shows the
+  provider's own page; nothing is extracted from it.

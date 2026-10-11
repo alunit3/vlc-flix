@@ -28,6 +28,7 @@ Item {
     property bool empty: true
 
     signal addFolder()
+    signal streamMagnet()
 
     implicitHeight: empty ? card.height + VLCStyle.dp(24, VLCStyle.scale)
                           : link.implicitHeight + VLCStyle.dp(24, VLCStyle.scale)
@@ -101,5 +102,20 @@ Item {
 
         HoverHandler { id: linkHover; cursorShape: Qt.PointingHandCursor }
         TapHandler { onTapped: root.addFolder() }
+    }
+
+    Text {
+        id: magnetLink
+
+        anchors.left: link.right
+        anchors.leftMargin: VLCStyle.dp(24, VLCStyle.scale)
+        anchors.verticalCenter: link.verticalCenter
+        visible: !root.empty
+        text: qsTr("Stream a magnet link") + "  \u203A"
+        color: magnetHover.hovered ? "#FFFFFF" : "#808080"
+        font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
+
+        HoverHandler { id: magnetHover; cursorShape: Qt.PointingHandCursor }
+        TapHandler { onTapped: root.streamMagnet() }
     }
 }

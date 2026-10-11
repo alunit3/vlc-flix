@@ -1092,6 +1092,7 @@ libqml_module_medialibrary_a_QML = \
 	medialibrary/qml/FlixCard.qml \
 	medialibrary/qml/FlixHero.qml \
 	medialibrary/qml/FlixHomePage.qml \
+	medialibrary/qml/FlixMagnetDialog.qml \
 	medialibrary/qml/FlixMeta.qml \
 	medialibrary/qml/FlixLibraryPrompt.qml \
 	medialibrary/qml/FlixMoreInfo.qml \
@@ -1191,6 +1192,7 @@ libqml_module_player_a_QML = \
 	player/qml/PIPPlayer.qml \
 	player/qml/FlixPauseOverlay.qml \
 	player/qml/FlixResumeToast.qml \
+	player/qml/FlixTorrentStats.qml \
 	player/qml/FlixSubOffer.qml \
 	player/qml/Player.qml \
 	player/qml/PlayerControlLayout.qml \

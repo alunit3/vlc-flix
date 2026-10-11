@@ -947,6 +947,14 @@ FocusScope {
         anchors.bottomMargin: VLCStyle.dp(150, VLCStyle.scale)
     }
 
+    // flix: live speed of a torrent that is being streamed
+    FlixTorrentStats {
+        anchors.right: parent.right
+        anchors.rightMargin: VLCStyle.dp(24, VLCStyle.scale)
+        anchors.top: parent.top
+        anchors.topMargin: VLCStyle.dp(72, VLCStyle.scale)
+    }
+
     // flix: "Download subtitles?" from the online subtitle service
     FlixSubOffer {
         anchors.left: parent.left

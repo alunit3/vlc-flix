@@ -32,11 +32,37 @@ Item {
     // an online title has no file to play: only the IMDb / Heartive buttons
     readonly property bool isWeb: item !== null && item.id === undefined
 
+    // web players of the streaming providers (Watch online)
+    property bool providersOpen: false
+    property var providers: []
+    property int webSeason: 1
+    property int webEpisode: 1
+    readonly property bool isTv: item !== null && (item.mediaType ?? "movie") === "tv"
+    readonly property var tmdbIdValue: item ? (item.tmdbId ?? meta.tmdbId ?? 0) : 0
+
+    function providerUrl(p) {
+        const template = isTv ? p.tv : p.movie
+        if (!template)
+            return ""
+        return template.replace("{tmdb}", tmdbIdValue).replace("{imdb}", imdb)
+                       .replace("{season}", webSeason).replace("{episode}", webEpisode)
+    }
+
+    function watchOnline(p) {
+        const url = providerUrl(p)
+        if (url === "")
+            return
+        MainCtx.setFlixPref("web/last", p.name)
+        MainCtx.openWebPlayer(url, root.meta.title || root.rawTitle)
+    }
+
     // true while the card is up; the item stays set until the exit animation is done
     property bool shown: false
 
     function open(entry) {
         closeTimer.stop()
+        providersOpen = false
+        providers = MainCtx.webProviders()
         item = entry
         shown = true
         forceActiveFocus()
@@ -320,6 +346,8 @@ Item {
                         if (root.imdb !== "") {
                             if (root.isWeb)
                                 list.push({ kind: "stream", primary: true, label: "▶  " + qsTr("Stream") })
+                            if (root.tmdbIdValue > 0)
+                                list.push({ kind: "web", primary: false, label: qsTr("Watch online") })
                             list.push({ kind: "imdb", primary: false, label: qsTr("Open IMDb") })
                             list.push({ kind: "torrents", primary: false, label: qsTr("Open Heartive (torrents)") })
                         }
@@ -361,6 +389,7 @@ Item {
                                 switch (btn.modelData.kind) {
                                 case "play": root.play(false); break
                                 case "restart": root.play(true); break
+                                case "web": root.providersOpen = !root.providersOpen; break
                                 case "stream":
                                     picker.open({ title: root.meta.title || root.rawTitle,
                                                   year: root.meta.year ?? 0,
@@ -369,6 +398,128 @@ Item {
                                     break
                                 case "imdb": MainCtx.openExternal(MainCtx.imdbUrl(root.imdb)); break
                                 case "torrents": MainCtx.openExternal(MainCtx.topTenUrl(root.imdb)); break
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // web players of the providers (opened in a window with Microsoft Edge WebView2)
+            Item {
+                id: providerBox
+
+                width: parent.width
+                height: root.providersOpen ? providerColumn.implicitHeight : 0
+                opacity: root.providersOpen ? 1.0 : 0.0
+                clip: true
+                visible: height > 0
+
+                Behavior on height { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 220 } }
+
+                Column {
+                    id: providerColumn
+
+                    width: parent.width
+                    spacing: VLCStyle.dp(10, VLCStyle.scale)
+
+                    Text {
+                        width: parent.width
+                        text: qsTr("Choose a provider: its web player opens in its own window")
+                        color: "#B3B3B3"
+                        font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
+                    }
+
+                    Row {
+                        visible: root.isTv
+                        spacing: VLCStyle.dp(8, VLCStyle.scale)
+
+                        Repeater {
+                            model: [{ key: "season", label: qsTr("Season") }, { key: "episode", label: qsTr("Episode") }]
+
+                            delegate: Row {
+                                id: numberRow
+
+                                required property var modelData
+
+                                spacing: VLCStyle.dp(6, VLCStyle.scale)
+
+                                Text {
+                                    height: VLCStyle.dp(28, VLCStyle.scale)
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: numberRow.modelData.label
+                                    color: "#B3B3B3"
+                                    font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
+                                }
+
+                                Rectangle {
+                                    width: VLCStyle.dp(56, VLCStyle.scale)
+                                    height: VLCStyle.dp(28, VLCStyle.scale)
+                                    radius: height / 2
+                                    color: "#2A2A2A"
+
+                                    TextInput {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: VLCStyle.dp(12, VLCStyle.scale)
+                                        anchors.rightMargin: VLCStyle.dp(12, VLCStyle.scale)
+                                        verticalAlignment: TextInput.AlignVCenter
+                                        color: "#FFFFFF"
+                                        font.pixelSize: VLCStyle.dp(14, VLCStyle.scale)
+                                        validator: IntValidator { bottom: 1; top: 999 }
+                                        text: String(numberRow.modelData.key === "season" ? root.webSeason : root.webEpisode)
+                                        onEditingFinished: {
+                                            const v = Math.max(1, Number(text) || 1)
+                                            if (numberRow.modelData.key === "season")
+                                                root.webSeason = v
+                                            else
+                                                root.webEpisode = v
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Flow {
+                        width: parent.width
+                        spacing: VLCStyle.dp(8, VLCStyle.scale)
+
+                        Repeater {
+                            model: root.providers
+
+                            delegate: Rectangle {
+                                id: chip
+
+                                required property var modelData
+
+                                readonly property bool last: MainCtx.flixPref("web/last", "") === modelData.name
+
+                                width: chipLabel.implicitWidth + 2 * VLCStyle.dp(14, VLCStyle.scale)
+                                height: VLCStyle.dp(30, VLCStyle.scale)
+                                radius: height / 2
+                                color: chipHover.hovered ? "#FFFFFF" : (last ? "#3A3A3A" : "#2A2A2A")
+                                scale: chipTap.pressed ? 0.95 : 1.0
+
+                                Behavior on color { ColorAnimation { duration: 160 } }
+                                Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.OutCubic } }
+
+                                Text {
+                                    id: chipLabel
+
+                                    anchors.centerIn: parent
+                                    text: chip.modelData.name
+                                    color: chipHover.hovered ? "#141414" : "#E5E5E5"
+                                    font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
+                                    font.weight: Font.DemiBold
+                                }
+
+                                HoverHandler { id: chipHover; cursorShape: Qt.PointingHandCursor }
+                                TapHandler {
+                                    id: chipTap
+
+                                    gesturePolicy: TapHandler.ReleaseWithinBounds
+                                    onTapped: root.watchOnline(chip.modelData)
                                 }
                             }
                         }

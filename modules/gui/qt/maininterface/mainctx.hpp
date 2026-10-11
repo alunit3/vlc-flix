@@ -432,6 +432,17 @@ public:
     Q_INVOKABLE bool metaEnabled() const;
     // flix: torrent sources / streaming through the flixtorrent helper (flix/torrent)
     Q_INVOKABLE bool torrentAvailable() const;
+    // live numbers of the running stream: speedBps, upBps, peers, seeders, bufferPct, downloaded, uploaded, total
+    Q_PROPERTY(QVariantMap torrentStats MEMBER m_torrentStats NOTIFY torrentStatsChanged FINAL)
+    // the torrent behind a magnet link or .torrent file: its name and files ({idx, name, size, video})
+    Q_INVOKABLE void torrentFiles(const QVariantMap &source);
+    // the clipboard text when it is a magnet link, else an empty string
+    Q_INVOKABLE QString clipboardMagnet() const;
+    Q_INVOKABLE QString pickTorrentFile(const QString &title) const;
+    // web players of streaming providers (WebView2 helper window)
+    Q_INVOKABLE bool webPlayerAvailable() const;
+    Q_INVOKABLE QVariantList webProviders();
+    Q_INVOKABLE void openWebPlayer(const QUrl &url, const QString &title);
     Q_INVOKABLE void torrentSources(const QString &imdbId, int season, int episode);
     Q_INVOKABLE void torrentStart(const QVariantMap &source);
     Q_INVOKABLE void torrentCancel();
@@ -564,6 +575,9 @@ protected:
     class QProcess *m_streamProc = nullptr;
     QByteArray m_streamBuffer;
     QString m_torrentError;
+    QVariantMap m_torrentStats;
+    class QProcess *m_filesProc = nullptr;
+    class QProcess *m_webProc = nullptr;
     QString torrentHelper() const;
     QString torrentDir() const;
     void stopTorrent();
@@ -686,6 +700,8 @@ signals:
     void resumeFractionChanged(double);
     void torrentSourcesReady(const QVariantList &items, const QString &error);
     void torrentStatus(const QVariantMap &status);
+    void torrentStatsChanged();
+    void torrentFilesReady(const QString &name, const QVariantList &files, const QString &error);
 
     void usingTouchChanged();
 

@@ -16,7 +16,7 @@ import (
 	"github.com/anacrolix/torrent/types"
 )
 
-var reMagnet = regexp.MustCompile(`^magnet:\?xt=urn:btih:[0-9a-fA-F]{40}(&.*)?$`)
+var reMagnet = regexp.MustCompile(`^magnet:\?xt=urn:btih:([0-9a-fA-F]{40}|[A-Za-z2-7]{32})(&.*)?$`)
 
 var videoExt = map[string]bool{
 	".mkv": true, ".mp4": true, ".avi": true, ".mov": true, ".m4v": true, ".webm": true,
@@ -54,8 +54,8 @@ func piecesComplete(t *torrent.Torrent, begin, end int) (done, total int) {
 	return
 }
 
-func runStream(magnet string, fileIdx int, dataDir string, keep bool, parentPid int) int {
-	if !reMagnet.MatchString(magnet) {
+func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep bool, parentPid int) int {
+	if torrentFile == "" && !reMagnet.MatchString(magnet) {
 		return fail("bad magnet link")
 	}
 	if dataDir == "" {
@@ -96,7 +96,12 @@ func runStream(magnet string, fileIdx int, dataDir string, keep bool, parentPid 
 	}
 
 	emit(map[string]any{"event": "connecting"})
-	t, err := client.AddMagnet(magnet)
+	var t *torrent.Torrent
+	if torrentFile != "" {
+		t, err = client.AddTorrentFromFile(torrentFile)
+	} else {
+		t, err = client.AddMagnet(magnet)
+	}
 	if err != nil {
 		return fail("cannot add torrent: " + err.Error())
 	}
@@ -179,7 +184,7 @@ func runStream(magnet string, fileIdx int, dataDir string, keep bool, parentPid 
 	ready := false
 	ticker := time.NewTicker(700 * time.Millisecond)
 	defer ticker.Stop()
-	var lastBytes int64
+	var lastBytes, lastUp int64
 	lastTime := time.Now()
 	for {
 		select {
@@ -198,11 +203,15 @@ func runStream(magnet string, fileIdx int, dataDir string, keep bool, parentPid 
 		stats := t.Stats()
 		now := time.Now()
 		done := t.BytesCompleted()
-		speed := int64(float64(done-lastBytes) / now.Sub(lastTime).Seconds())
-		lastBytes, lastTime = done, now
+		dt := now.Sub(lastTime).Seconds()
+		speed := int64(float64(done-lastBytes) / dt)
+		up := stats.BytesWrittenData.Int64()
+		upSpeed := int64(float64(up-lastUp) / dt)
+		lastBytes, lastUp, lastTime = done, up, now
 		emit(map[string]any{
 			"event": "progress", "bufferPct": pct, "downloaded": done, "total": length,
-			"peers": stats.ActivePeers, "seeders": stats.ConnectedSeeders, "speedBps": speed,
+			"peers": stats.ActivePeers, "seeders": stats.ConnectedSeeders,
+			"speedBps": speed, "upBps": upSpeed, "uploaded": up,
 		})
 		if !ready && have >= need {
 			ready = true

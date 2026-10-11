@@ -166,7 +166,8 @@ Item {
 
                     Text {
                         anchors.centerIn: parent
-                        text: "✕"
+                        text: VLCIcons.close
+                        font.family: VLCIcons.fontFamily
                         color: "#FFFFFF"
                         font.pixelSize: VLCStyle.dp(10, VLCStyle.scale)
                     }

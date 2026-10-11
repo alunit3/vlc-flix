@@ -111,6 +111,17 @@ FocusScope {
         }
     }
 
+    // VLCFlix: leave the player at once. The view switches first; stopping the playback (which can
+    // wait for the network on a stream) happens right after, so a click is never "lost" to a frozen UI.
+    function goBack() {
+        if (!MainCtx.playerView)
+            return
+        const stopPlayback = MainCtx.hasEmbededVideo && !MainCtx.canShowVideoPIP
+        MainCtx.playerView = false
+        if (stopPlayback)
+            Qt.callLater(function() { MainPlaylistController.stop() })
+    }
+
     // Private
 
     function _onNavigationCancel() {
@@ -1019,12 +1030,7 @@ FocusScope {
             rootPlayer.lockUnlockAutoHide(lock)
         }
 
-        onBackRequested: {
-            if (MainCtx.hasEmbededVideo && !MainCtx.canShowVideoPIP) {
-               MainPlaylistController.stop()
-            }
-            MainCtx.playerView = false
-        }
+        onBackRequested: rootPlayer.goBack()
 
         FadeControllerStateGroup {
             target: topBar
@@ -1052,6 +1058,19 @@ FocusScope {
 
             visible: MainCtx.pinVideoControls || (MainCtx.hasEmbededVideo && !rootPlayer.displayFadeRectangles)
         }
+    }
+
+    // VLCFlix: hot corner that goes back on the first click even while the controls are hidden
+    FlixBackButton {
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.topMargin: VLCStyle.applicationVerticalMargin
+        anchors.leftMargin: VLCStyle.applicationHorizontalMargin
+        z: 2
+
+        topBar: topBar
+
+        onClicked: rootPlayer.goBack()
     }
 
     Loader {
@@ -1402,9 +1421,7 @@ FocusScope {
         acceptedButtons: Qt.BackButton
         propagateComposedEvents: true
         cursorShape: undefined
-        onClicked: {
-            MainCtx.playerView = false
-        }
+        onClicked: rootPlayer.goBack()
     }
 
     //filter key events to keep toolbar

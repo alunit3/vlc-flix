@@ -462,6 +462,16 @@ public:
     Q_INVOKABLE QVariantList storageInfo() const;
     Q_INVOKABLE bool clearStorage(const QString &kind);
     Q_INVOKABLE bool torrentRunning() const { return m_streamProc != nullptr; }
+
+    // VLCFlix settings: the flix-* / flixsubs-* VLC options (a fixed list), kept in the VLC settings file
+    Q_INVOKABLE QVariant vlcOption(const QString &name) const;
+    Q_INVOKABLE bool hasVlcOption(const QString &name) const;       // non-empty (used for secrets)
+    Q_INVOKABLE bool setVlcOption(const QString &name, const QVariant &value);
+    // ask the Lua service to check an account: {kind: "tmdb"|"opensubtitles", token | key, user, password}
+    Q_INVOKABLE void testAccount(const QVariantMap &request);
+    // put the built-in streaming provider list back
+    Q_INVOKABLE void resetWebProviders();
+    Q_INVOKABLE QString providersFile() const;
     Q_INVOKABLE void torrentSources(const QString &imdbId, int season, int episode);
     Q_INVOKABLE void torrentStart(const QVariantMap &source);
     Q_INVOKABLE void torrentCancel();
@@ -601,6 +611,7 @@ protected:
     QVariantMap readResume() const;
     void writeResume(const QVariantMap &all) const;
     QStringList trackerArgs() const;
+    QStringList rateArgs() const;
     class QProcess *m_filesProc = nullptr;
     class QProcess *m_webProc = nullptr;
     QString torrentHelper() const;
@@ -611,7 +622,6 @@ protected:
 
 public slots:
     void toggleToolbarMenu();
-    QStringList rateArgs() const;
     void toggleInterfaceFullScreen();
     void setPlayerPlaylistWidth( double factor );
     void setInterfaceAlwaysOnTop( bool );
@@ -645,6 +655,7 @@ public slots:
     // flix: the Lua subtitle service found subtitles and asks whether to download them
     void emitSubtitleOffer(const QString &json) { emit subtitleOffered(json); }
     void emitMetaUpdate(const QString &key) { emit metaUpdated(key); }
+    void emitAccountResult(const QString &json);
     /** answer an offer made through subtitleOffered(): the service downloads on accept */
     Q_INVOKABLE void answerSubtitleOffer(int fileId, bool accept);
 
@@ -661,6 +672,7 @@ signals:
     void subtitleOffered(const QString &json);
     /** a cache entry ("top10" or a title key) was written by flixsubs.lua */
     void metaUpdated(const QString &key);
+    void accountTestResult(const QString &kind, bool ok, const QString &message);
     void fullscreenInterfaceToggled( bool );
     void setInterfaceVisibible(bool );
     void setInterfaceFullScreen( bool );

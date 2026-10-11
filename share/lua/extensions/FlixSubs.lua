@@ -84,7 +84,7 @@ local function new_client()
 end
 
 local ERRORS = {
-    missing_key = "Set your OpenSubtitles API key in Preferences first.",
+    missing_key = "Enter your OpenSubtitles API key below and press Log in.",
     unauthorized = "OpenSubtitles refused the username or password.",
     forbidden = "OpenSubtitles refused the request. Check the API key.",
     quota = "OpenSubtitles download limit reached for today.",
@@ -188,7 +188,7 @@ local function download()
 
     local user, password = setting("flixsubs-user"), setting("flixsubs-password")
     if user == "" or password == "" then
-        say("Set your OpenSubtitles username and password in Preferences first.")
+        say("Enter your OpenSubtitles username and password below and press Log in.")
         return
     end
 
@@ -219,6 +219,40 @@ local function download()
         added = pcall(vlc.input.add_subtitle, saved)
     end
     say(added and ("Subtitles added: " .. basename(saved)) or ("Saved to " .. saved))
+end
+
+-- checks the account typed in the window and keeps it (VLCFlix settings) when OpenSubtitles accepts it
+local function login()
+    local key = api.trim(widgets.key:get_text())
+    local user = api.trim(widgets.user:get_text())
+    local password = widgets.pass:get_text() or ""
+    if password == "" then password = setting("flixsubs-password") end   -- empty field: keep the saved one
+    if key == "" then
+        widgets.account:set_text("Enter the API key first.")
+        dlg:update()
+        return
+    end
+    if user == "" or password == "" then
+        widgets.account:set_text("Enter the username and the password.")
+        dlg:update()
+        return
+    end
+    widgets.account:set_text("Logging in...")
+    dlg:update()
+    local client = api.new(key, VERSION, setting("flixsubs-base-url"))
+    local ok, err = client:login(user, password)
+    if not ok then
+        widgets.account:set_text(explain(err))
+        dlg:update()
+        return
+    end
+    pcall(vlc.config.set, "flixsubs-api-key", key)
+    pcall(vlc.config.set, "flixsubs-user", user)
+    pcall(vlc.config.set, "flixsubs-password", password)
+    local left = client.account and client.account.remaining_downloads
+    widgets.account:set_text("Logged in as " .. user .. (left and (", " .. tostring(left) .. " downloads left today") or "") .. ". Saved.")
+    widgets.pass:set_text("")
+    say("Account saved. You can search and download now.")
 end
 
 -- an error in a button handler must show up in the window, not vanish
@@ -274,8 +308,19 @@ local function build()
     dlg:add_button("Download", guarded(download), 1, 10, 2, 1)
     widgets.status = dlg:add_label("", 3, 10, 3, 1)
 
+    -- account: API key, username, password and a Log in button that checks them
+    dlg:add_label("<b>API key</b>", 1, 11, 1, 1)
+    widgets.key = dlg:add_text_input(setting("flixsubs-api-key"), 2, 11, 4, 1)
+    dlg:add_label("<b>Username</b>", 1, 12, 1, 1)
+    widgets.user = dlg:add_text_input(setting("flixsubs-user"), 2, 12, 2, 1)
+    dlg:add_label("<b>Password</b>", 4, 12, 1, 1)
+    widgets.pass = dlg:add_password("", 5, 12, 1, 1)
+    dlg:add_button("Log in", guarded(login), 1, 13, 2, 1)
+    local saved = setting("flixsubs-api-key") ~= "" and setting("flixsubs-user") ~= ""
+    widgets.account = dlg:add_label(saved and ("Account: " .. setting("flixsubs-user") .. " (leave the password empty to keep it)")
+                                    or "Not logged in. Get an API key at opensubtitles.com/consumers.", 3, 13, 3, 1)
     if not setting("flixsubs-api-key") or setting("flixsubs-api-key") == "" then
-        widgets.status:set_text("Set your OpenSubtitles API key, username and password in Preferences first.")
+        widgets.status:set_text("Enter your OpenSubtitles account below and press Log in.")
     end
     dlg:show()
 end

@@ -203,12 +203,13 @@ Item {
         id: btn
 
         property string text
+        property string icon: ""
         property bool primary: false
         property bool busy: false
 
         signal clicked()
 
-        width: btnLabel.implicitWidth + 2 * VLCStyle.dp(22, VLCStyle.scale)
+        width: btnRow.implicitWidth + 2 * VLCStyle.dp(22, VLCStyle.scale)
         height: VLCStyle.dp(40, VLCStyle.scale)
         radius: VLCStyle.dp(4, VLCStyle.scale)
         opacity: enabled ? 1.0 : 0.4
@@ -219,14 +220,30 @@ Item {
         Behavior on color { ColorAnimation { duration: 160 } }
         Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
-        Text {
-            id: btnLabel
+        Row {
+            id: btnRow
 
             anchors.centerIn: parent
-            text: btn.text
-            color: btn.primary ? "#141414" : "#FFFFFF"
-            font.pixelSize: VLCStyle.dp(15, VLCStyle.scale)
-            font.weight: Font.Bold
+            spacing: VLCStyle.dp(8, VLCStyle.scale)
+
+            Text {
+                visible: btn.icon !== ""
+                anchors.verticalCenter: parent.verticalCenter
+                text: btn.icon
+                font.family: VLCIcons.fontFamily
+                color: btn.primary ? "#141414" : "#FFFFFF"
+                font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
+            }
+
+            Text {
+                id: btnLabel
+
+                anchors.verticalCenter: parent.verticalCenter
+                text: btn.text
+                color: btn.primary ? "#141414" : "#FFFFFF"
+                font.pixelSize: VLCStyle.dp(15, VLCStyle.scale)
+                font.weight: Font.Bold
+            }
         }
 
         HoverHandler { id: btnHover; cursorShape: Qt.PointingHandCursor }
@@ -399,7 +416,8 @@ Item {
 
             Text {
                 anchors.centerIn: parent
-                text: "✕"
+                text: VLCIcons.close
+                font.family: VLCIcons.fontFamily
                 color: "#FFFFFF"
                 font.pixelSize: VLCStyle.dp(15, VLCStyle.scale)
             }
@@ -446,12 +464,23 @@ Item {
                 Behavior on color { ColorAnimation { duration: 140 } }
 
                 Text {
+                    visible: row.modelData.video
                     anchors.left: parent.left
                     anchors.leftMargin: VLCStyle.dp(14, VLCStyle.scale)
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: VLCIcons.play_filled
+                    font.family: VLCIcons.fontFamily
+                    color: "#FFFFFF"
+                    font.pixelSize: VLCStyle.dp(14, VLCStyle.scale)
+                }
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: row.modelData.video ? VLCStyle.dp(38, VLCStyle.scale) : VLCStyle.dp(14, VLCStyle.scale)
                     anchors.right: sizeText.left
                     anchors.rightMargin: VLCStyle.dp(10, VLCStyle.scale)
                     anchors.verticalCenter: parent.verticalCenter
-                    text: (row.modelData.video ? "▶  " : "") + row.modelData.name
+                    text: row.modelData.name
                     color: "#FFFFFF"
                     font.pixelSize: VLCStyle.dp(14, VLCStyle.scale)
                     elide: Text.ElideMiddle
@@ -516,7 +545,8 @@ Item {
 
                     anchors.verticalCenter: parent.verticalCenter
                     primary: true
-                    text: "▶  " + qsTr("Stream")
+                    icon: VLCIcons.play_filled
+                    text: qsTr("Stream")
                     enabled: root.selectedIdx >= 0
                     onClicked: root.startStreaming()
                 }

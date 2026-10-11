@@ -112,7 +112,8 @@ Item {
         Text {
             anchors.centerIn: parent
             visible: art.status !== Image.Ready
-            text: "▶"
+            text: VLCIcons.play_filled
+            font.family: VLCIcons.fontFamily
             color: "#4D4D4D"
             font.pixelSize: VLCStyle.dp(30, VLCStyle.scale)
         }
@@ -185,7 +186,8 @@ Item {
             Text {
                 anchors.centerIn: parent
                 anchors.horizontalCenterOffset: VLCStyle.dp(2, VLCStyle.scale)
-                text: "▶"
+                text: VLCIcons.play_filled
+                font.family: VLCIcons.fontFamily
                 color: "#FFFFFF"
                 font.pixelSize: VLCStyle.dp(18, VLCStyle.scale)
             }

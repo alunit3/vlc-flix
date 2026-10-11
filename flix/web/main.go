@@ -54,6 +54,10 @@ const progressScript = `(function () {
     var d = e.data;
     if (typeof d === 'string') { try { d = JSON.parse(d); } catch (x) { return; } }
     if (!d || typeof d !== 'object') return;
+    if (d.flixTime) {
+      try { window.flixProgress(d.flixTime.t, d.flixTime.d); } catch (x) {}
+      return;
+    }
     var p = d.data && typeof d.data === 'object' ? d.data : d;
     var t = p.currentTime !== undefined ? p.currentTime : (p.time !== undefined ? p.time : p.progress);
     var n = p.duration !== undefined ? p.duration : p.total;
@@ -61,6 +65,40 @@ const progressScript = `(function () {
       try { window.flixProgress(t, typeof n === 'number' && isFinite(n) ? n : 0); } catch (x) {}
     }
   });
+})();`
+
+// videoScript runs in every frame of the page (the players live in nested, cross-origin frames):
+// it finds the long video, reports its position to the top page and, once, jumps to the saved
+// position (%d seconds) when the provider has no start-time option of its own.
+const videoScript = `(function () {
+  var start = %d, jumped = false, sent = 0;
+  function hook(v) {
+    if (v.__flixHooked) return;
+    v.__flixHooked = true;
+    function ready() {
+      if (start > 0 && !jumped && isFinite(v.duration) && v.duration > 300 && start < v.duration - 30) {
+        jumped = true;
+        if (v.currentTime < start - 5) { try { v.currentTime = start; } catch (e) {} }
+      }
+    }
+    v.addEventListener('loadedmetadata', ready);
+    v.addEventListener('durationchange', ready);
+    v.addEventListener('timeupdate', function () {
+      var d = v.duration;
+      if (!isFinite(d) || d < 300) return;          // ads and previews are short
+      ready();
+      var now = Date.now();
+      if (now - sent < 1000) return;
+      sent = now;
+      try { window.top.postMessage({ flixTime: { t: v.currentTime, d: d } }, '*'); } catch (e) {}
+    });
+    ready();
+  }
+  function scan() {
+    var list = document.getElementsByTagName('video');
+    for (var i = 0; i < list.length; i++) hook(list[i]);
+  }
+  setInterval(scan, 1500);
 })();`
 
 var (
@@ -160,6 +198,7 @@ func main() {
 	title := flag.String("title", "VLCFlix", "window title")
 	dataDir := flag.String("data-dir", "", "folder for cookies and settings")
 	parent := flag.Int("parent-pid", 0, "close when this process ends")
+	start := flag.Int("start", 0, "seconds to continue from (for players without a start option)")
 	frame := flag.Bool("frame", false, "show the page inside a frame and report its playback progress")
 	flag.Parse()
 
@@ -204,6 +243,7 @@ func main() {
 	// players tell their page how far they are ("PLAYER_EVENT" with currentTime); shown directly
 	// the page is its own parent, so the message arrives here
 	w.Init(progressScript)
+	w.Init(fmt.Sprintf(videoScript, *start))
 	if *frame {
 		w.SetHtml(hostPage(u.String()))
 	} else {

@@ -210,11 +210,12 @@ Widgets.PageLoader {
                 id: chip
 
                 property string text
+                property string icon: ""
                 property bool selected: false
 
                 signal clicked()
 
-                width: chipLabel.implicitWidth + 2 * VLCStyle.dp(14, VLCStyle.scale)
+                width: chipRow.implicitWidth + 2 * VLCStyle.dp(14, VLCStyle.scale)
                 height: VLCStyle.dp(30, VLCStyle.scale)
                 radius: height / 2
                 color: selected ? "#FFFFFF" : (chipHover.hovered ? "#3A3A3A" : "#2A2A2A")
@@ -223,14 +224,30 @@ Widgets.PageLoader {
                 Behavior on color { ColorAnimation { duration: 160 } }
                 Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.OutCubic } }
 
-                Text {
-                    id: chipLabel
+                Row {
+                    id: chipRow
 
                     anchors.centerIn: parent
-                    text: chip.text
-                    color: chip.selected ? "#141414" : "#E5E5E5"
-                    font.pixelSize: VLCStyle.dp(14, VLCStyle.scale)
-                    font.weight: Font.DemiBold
+                    spacing: VLCStyle.dp(6, VLCStyle.scale)
+
+                    Text {
+                        visible: chip.icon !== ""
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: chip.icon
+                        font.family: VLCIcons.fontFamily
+                        color: chip.selected ? "#141414" : "#E5E5E5"
+                        font.pixelSize: VLCStyle.dp(14, VLCStyle.scale)
+                    }
+
+                    Text {
+                        id: chipLabel
+
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: chip.text
+                        color: chip.selected ? "#141414" : "#E5E5E5"
+                        font.pixelSize: VLCStyle.dp(14, VLCStyle.scale)
+                        font.weight: Font.DemiBold
+                    }
                 }
 
                 HoverHandler { id: chipHover; cursorShape: Qt.PointingHandCursor }
@@ -329,7 +346,8 @@ Widgets.PageLoader {
                             onClicked: page.online = false
                         }
                         Chip {
-                            text: "＋ " + qsTr("Magnet link")
+                            icon: VLCIcons.add
+                            text: qsTr("Magnet link")
                             onClicked: magnetDialog.open()
                         }
                     }

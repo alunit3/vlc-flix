@@ -79,7 +79,7 @@ Item {
         MainCtx.openWebPlayer(url, root.meta.title || root.rawTitle, false, {
             key: webKey, provider: p.name, title: root.meta.title || root.rawTitle,
             poster: root.meta.poster || (item.poster ?? ""), tmdbId: tmdbIdValue,
-            mediaType: isTv ? "tv" : "movie", season: webSeason, episode: webEpisode, imdb: imdb })
+            mediaType: isTv ? "tv" : "movie", season: webSeason, episode: webEpisode, imdb: imdb, start: start })
         root.providersOpen = false
     }
 
@@ -309,7 +309,8 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    text: "✕"
+                    text: VLCIcons.close
+                    font.family: VLCIcons.fontFamily
                     color: "#FFFFFF"
                     font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
                 }
@@ -374,23 +375,25 @@ Item {
                         if (!root.isWeb) {
                             if (root.hasResume) {
                                 list.push({ kind: "play", primary: true,
-                                            label: "▶  " + (root.resumeSeconds > 0 ? qsTr("Resume from %1").arg(root._clock(root.resumeSeconds))
-                                                                                  : qsTr("Resume")) })
+                                            icon: VLCIcons.play_filled,
+                                            label: (root.resumeSeconds > 0 ? qsTr("Resume from %1").arg(root._clock(root.resumeSeconds))
+                                                                           : qsTr("Resume")) })
                                 list.push({ kind: "restart", primary: false, label: qsTr("Play from beginning") })
                             } else {
-                                list.push({ kind: "play", primary: true, label: "▶  " + qsTr("Play") })
+                                list.push({ kind: "play", primary: true, icon: VLCIcons.play_filled, label: qsTr("Play") })
                             }
                         }
                         if (root.imdb !== "") {
                             if (root.isWeb)
-                                list.push({ kind: "stream", primary: true, label: "▶  " + qsTr("Stream") })
+                                list.push({ kind: "stream", primary: true, icon: VLCIcons.play_filled, label: qsTr("Stream") })
                             if (root.tmdbIdValue > 0) {
                                 list.push({ kind: "web", primary: false,
                                             label: root.webResume > 0 ? qsTr("Resume online from %1").arg(root._clock(root.webResume))
                                                                       : qsTr("Watch online") })
                                 if (root.webResume > 0)
                                     list.push({ kind: "webstart", primary: false, label: qsTr("Online from beginning") })
-                                list.push({ kind: "providers", primary: false, label: qsTr("Providers") + (root.providersOpen ? "  ▴" : "  ▾") })
+                                list.push({ kind: "providers", primary: false, label: qsTr("Providers"),
+                                            trail: root.providersOpen ? VLCIcons.chevron_up : VLCIcons.chevron_down })
                             }
                             list.push({ kind: "imdb", primary: false, label: qsTr("Open IMDb") })
                             list.push({ kind: "torrents", primary: false, label: qsTr("Open Heartive (torrents)") })
@@ -403,7 +406,7 @@ Item {
 
                         required property var modelData
 
-                        width: btnLabel.implicitWidth + 2 * VLCStyle.dp(24, VLCStyle.scale)
+                        width: btnRow.implicitWidth + 2 * VLCStyle.dp(24, VLCStyle.scale)
                         height: VLCStyle.dp(40, VLCStyle.scale)
                         radius: VLCStyle.dp(4, VLCStyle.scale)
                         color: modelData.primary ? (btnHover.hovered ? "#BFBFBF" : "#FFFFFF")
@@ -413,14 +416,39 @@ Item {
                         Behavior on color { ColorAnimation { duration: 160 } }
                         Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
-                        Text {
-                            id: btnLabel
+                        Row {
+                            id: btnRow
 
                             anchors.centerIn: parent
-                            text: btn.modelData.label
-                            color: btn.modelData.primary ? "#141414" : "#FFFFFF"
-                            font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
-                            font.weight: Font.Bold
+                            spacing: VLCStyle.dp(8, VLCStyle.scale)
+
+                            Text {
+                                visible: (btn.modelData.icon ?? "") !== ""
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: btn.modelData.icon ?? ""
+                                font.family: VLCIcons.fontFamily
+                                color: btn.modelData.primary ? "#141414" : "#FFFFFF"
+                                font.pixelSize: VLCStyle.dp(18, VLCStyle.scale)
+                            }
+
+                            Text {
+                                id: btnLabel
+
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: btn.modelData.label
+                                color: btn.modelData.primary ? "#141414" : "#FFFFFF"
+                                font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
+                                font.weight: Font.Bold
+                            }
+
+                            Text {
+                                visible: (btn.modelData.trail ?? "") !== ""
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: btn.modelData.trail ?? ""
+                                font.family: VLCIcons.fontFamily
+                                color: "#FFFFFF"
+                                font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
+                            }
                         }
 
                         HoverHandler { id: btnHover; cursorShape: Qt.PointingHandCursor }

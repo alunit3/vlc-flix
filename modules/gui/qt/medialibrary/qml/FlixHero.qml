@@ -221,7 +221,8 @@ Item {
                         spacing: VLCStyle.dp(10, VLCStyle.scale)
 
                         Text {
-                            text: "\u25B6"
+                            text: VLCIcons.play_filled
+                            font.family: VLCIcons.fontFamily
                             color: "#141414"
                             font.pixelSize: VLCStyle.dp(18, VLCStyle.scale)
                             anchors.verticalCenter: parent.verticalCenter

@@ -215,27 +215,24 @@ T.ToolBar {
                 Navigation.parentItem: root
                 Navigation.leftItem: navigationButtons
 
-                // VLCFlix: storage, cache and trackers
-                Rectangle {
-                    id: storageBtn
+                // VLCFlix settings
+                Widgets.IconToolButton {
+                    id: flixSettingsBtn
 
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: VLCStyle.bannerButton_height
-                    height: width
-                    radius: width / 2
-                    color: storageHover.hovered ? Qt.rgba(1, 1, 1, 0.16) : "transparent"
+                    font.pixelSize: VLCStyle.icon_banner
+                    text: VLCIcons.settings
+                    description: qsTr("VLCFlix settings")
 
-                    Behavior on color { ColorAnimation { duration: 140 } }
+                    AccessibleCompat.id: "flixSettingsButton"
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: "⚙"
-                        color: "#E5E5E5"
-                        font.pixelSize: VLCStyle.dp(20, VLCStyle.scale)
-                    }
+                    width: VLCStyle.bannerButton_width
+                    height: VLCStyle.bannerButton_height
 
-                    HoverHandler { id: storageHover; cursorShape: Qt.PointingHandCursor }
-                    TapHandler { gesturePolicy: TapHandler.ReleaseWithinBounds; onTapped: root.storageRequested() }
+                    Navigation.parentItem: playqueueButtonsTop
+                    Navigation.rightItem: playlistBtn
+                    Navigation.leftItem: historyBack
+
+                    onClicked: root.storageRequested()
                 }
 
                 Widgets.IconToolButton {
@@ -253,7 +250,7 @@ T.ToolBar {
 
                     Navigation.parentItem: playqueueButtonsTop
                     Navigation.rightItem: menuBtn
-                    Navigation.leftItem: historyBack
+                    Navigation.leftItem: flixSettingsBtn
 
                     onClicked:  root.togglePlayqueueVisibility()
 

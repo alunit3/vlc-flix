@@ -121,6 +121,8 @@ static int SubtitleOfferCB( vlc_object_t *p_this, const char *psz_variable,
                             vlc_value_t old_val, vlc_value_t new_val, void *param );
 static int MetaUpdateCB( vlc_object_t *p_this, const char *psz_variable,
                          vlc_value_t old_val, vlc_value_t new_val, void *param );
+static int AccountResultCB( vlc_object_t *p_this, const char *psz_variable,
+                            vlc_value_t old_val, vlc_value_t new_val, void *param );
 
 const QEvent::Type MainCtx::ToolbarsNeedRebuild =
         (QEvent::Type)QEvent::registerEventType();
@@ -281,6 +283,7 @@ MainCtx::MainCtx(qt_intf_t *_p_intf)
     var_AddCallback( libvlc, "intf-show", IntfRaiseMainCB, p_intf );
     var_AddCallback( libvlc, "flix-sub-offer", SubtitleOfferCB, p_intf );
     var_AddCallback( libvlc, "flix-meta-update", MetaUpdateCB, p_intf );
+    var_AddCallback( libvlc, "flix-account-result", AccountResultCB, p_intf );
 
     /* Register callback for the intf-popupmenu variable */
     var_AddCallback( libvlc, "intf-popupmenu", PopupMenuCB, p_intf );
@@ -395,6 +398,7 @@ MainCtx::~MainCtx()
     var_DelCallback( libvlc, "intf-show", IntfRaiseMainCB, p_intf );
     var_DelCallback( libvlc, "flix-sub-offer", SubtitleOfferCB, p_intf );
     var_DelCallback( libvlc, "flix-meta-update", MetaUpdateCB, p_intf );
+    var_DelCallback( libvlc, "flix-account-result", AccountResultCB, p_intf );
     var_DelCallback( libvlc, "intf-toggle-fscontrol", IntfShowCB, p_intf );
     var_DelCallback( libvlc, "intf-popupmenu", PopupMenuCB, p_intf );
 
@@ -974,7 +978,7 @@ void MainCtx::openWebPlayer(const QUrl &url, const QString &title, bool frame, c
             // finished (>95 %) or barely started (<30 s): not worth continuing
             if( length > 0 && seconds / length > 0.95 )
                 all.remove( key );
-            else if( seconds >= 30 )
+            else if( seconds >= 20 )
                 all.insert( key, entry );
             writeResume( all );
             emit resumeChanged();
@@ -997,6 +1001,8 @@ void MainCtx::openWebPlayer(const QUrl &url, const QString &title, bool frame, c
                        QStringLiteral("--parent-pid"), QString::number( QCoreApplication::applicationPid() ) };
     if( frame && !key.isEmpty() )
         args << QStringLiteral("--frame");
+    if( info.value( QStringLiteral("start") ).toInt() > 0 )
+        args << QStringLiteral("--start") << QString::number( info.value( QStringLiteral("start") ).toInt() );
     proc->start( QCoreApplication::applicationDirPath() + QStringLiteral("/flix/flixweb.exe"), args );
 }
 
@@ -1102,6 +1108,94 @@ void MainCtx::saveTorrentResume(double fraction, int seconds, int length)
     emit resumeChanged();
 }
 
+// --- VLCFlix settings -----------------------------------------------------------------------
+
+static bool flixOptionAllowed( const QString &name )
+{
+    static const QSet<QString> allowed {
+        QStringLiteral("flixsubs-api-key"), QStringLiteral("flixsubs-user"), QStringLiteral("flixsubs-password"),
+        QStringLiteral("flixsubs-languages"), QStringLiteral("flixsubs-auto"), QStringLiteral("flixsubs-ask"),
+        QStringLiteral("flix-tmdb-token"), QStringLiteral("flix-meta-language"), QStringLiteral("flix-top10-target"),
+    };
+    return allowed.contains( name );
+}
+
+QVariant MainCtx::vlcOption(const QString &name) const
+{
+    if( !flixOptionAllowed( name ) )
+        return {};
+    const QByteArray n = name.toUtf8();
+    switch( config_GetType( n.constData() ) )
+    {
+        case VLC_VAR_STRING:
+        {
+            char *v = var_InheritString( p_intf, n.constData() );
+            const QString r = v ? qfu( v ) : QString();
+            free( v );
+            return r;
+        }
+        case VLC_VAR_BOOL:
+            return bool( var_InheritBool( p_intf, n.constData() ) );
+        case VLC_VAR_INTEGER:
+            return qlonglong( var_InheritInteger( p_intf, n.constData() ) );
+        default:
+            return {};
+    }
+}
+
+bool MainCtx::hasVlcOption(const QString &name) const
+{
+    const QVariant v = vlcOption( name );
+    return v.isValid() && !v.toString().isEmpty();
+}
+
+bool MainCtx::setVlcOption(const QString &name, const QVariant &value)
+{
+    if( !flixOptionAllowed( name ) )
+        return false;
+    const QByteArray n = name.toUtf8();
+    switch( config_GetType( n.constData() ) )
+    {
+        case VLC_VAR_STRING:
+            config_PutPsz( n.constData(), value.toString().trimmed().toUtf8().constData() );
+            break;
+        case VLC_VAR_BOOL:
+        case VLC_VAR_INTEGER:
+            config_PutInt( n.constData(), value.toBool() ? 1 : ( value.toInt() ) );
+            break;
+        default:
+            return false;
+    }
+    config_SaveConfigFile( p_intf );
+    return true;
+}
+
+void MainCtx::testAccount(const QVariantMap &request)
+{
+    // handed to the Lua service in this process; nothing is logged or written to disk here
+    var_SetString( vlc_object_instance(p_intf), "flix-account-request",
+                   QJsonDocument( QJsonObject::fromVariantMap( request ) ).toJson( QJsonDocument::Compact ).constData() );
+}
+
+void MainCtx::emitAccountResult(const QString &json)
+{
+    const QJsonObject o = QJsonDocument::fromJson( json.toUtf8() ).object();
+    emit accountTestResult( o.value( QStringLiteral("kind") ).toString(), o.value( QStringLiteral("ok") ).toBool(),
+                            o.value( QStringLiteral("message") ).toString() );
+}
+
+QString MainCtx::providersFile() const
+{
+    return QDir::toNativeSeparators( QDir::cleanPath( torrentDir() + QStringLiteral("/../flix-providers.json") ) );
+}
+
+void MainCtx::resetWebProviders()
+{
+    QFile out( torrentDir() + QStringLiteral("/../flix-providers.json") );
+    if( out.open( QIODevice::WriteOnly | QIODevice::Truncate ) )
+        out.write( defaultProviders );
+}
+
 // --- trackers -------------------------------------------------------------------------------
 
 QString MainCtx::userTrackers() const
@@ -1142,6 +1236,19 @@ QStringList MainCtx::trackerArgs() const
 {
     const QString path = userFile( QStringLiteral("flix-trackers.txt") );
     return QFileInfo::exists( path ) ? QStringList { QStringLiteral("--trackers-file"), path } : QStringList();
+}
+
+// speed caps in bytes/s; 0 (or unset) means unlimited, and then the flag is left out
+QStringList MainCtx::rateArgs() const
+{
+    QStringList args;
+    const qint64 down = flixPref( QStringLiteral("torrent/rateDown"), 0 ).toLongLong();
+    if( down > 0 )
+        args << QStringLiteral("--rate-limit") << QString::number( down );
+    const qint64 up = flixPref( QStringLiteral("torrent/rateUp"), 0 ).toLongLong();
+    if( up > 0 )
+        args << QStringLiteral("--upload-rate-limit") << QString::number( up );
+    return args;
 }
 
 // --- storage --------------------------------------------------------------------------------
@@ -1238,19 +1345,6 @@ bool MainCtx::clearStorage(const QString &kind)
         if( m_webProc )
             return false;
         return QDir( userFile( QStringLiteral("flix-web") ) ).removeRecursively();
-// speed caps in bytes/s; 0 (or unset) means unlimited, and then the flag is left out
-QStringList MainCtx::rateArgs() const
-{
-    QStringList args;
-    const qint64 down = flixPref( QStringLiteral("torrent/rateDown"), 0 ).toLongLong();
-    if( down > 0 )
-        args << QStringLiteral("--rate-limit") << QString::number( down );
-    const qint64 up = flixPref( QStringLiteral("torrent/rateUp"), 0 ).toLongLong();
-    if( up > 0 )
-        args << QStringLiteral("--upload-rate-limit") << QString::number( up );
-    return args;
-}
-
     }
     if( kind == QLatin1String("resume") )
     {
@@ -1481,7 +1575,11 @@ void MainCtx::torrentStart(const QVariantMap &source)
                        QStringLiteral("--parent-pid"), QString::number( QCoreApplication::applicationPid() ) };
     if( fileIdx >= 0 )
         args << QStringLiteral("--file-idx") << QString::number( fileIdx );
+    // continuing: buffer the part the player is about to seek to before the stream is announced
+    if( const double resumeAt = torrentResume(); resumeAt > 0.0 )
+        args << QStringLiteral("--start-fraction") << QString::number( resumeAt, 'f', 4 );
     args << trackerArgs();
+    args << rateArgs();
     proc->start( torrentHelper(), args );
 }
 
@@ -1579,7 +1677,6 @@ QVariantMap MainCtx::meta(const QString &name)
         }
         m_metaTimer->start( 300 );
     }
-    args << rateArgs();
     return {};
 }
 
@@ -2132,6 +2229,16 @@ static int SubtitleOfferCB( vlc_object_t *, const char *,
 }
 
 /* flix: called from the Lua service's thread with the key of a new cache entry */
+static int AccountResultCB( vlc_object_t *, const char *,
+                            vlc_value_t, vlc_value_t new_val, void *param )
+{
+    qt_intf_t *p_intf = (qt_intf_t *)param;
+    if( new_val.psz_string != NULL && new_val.psz_string[0] != '\0' && p_intf->p_mi != NULL )
+        p_intf->p_mi->emitAccountResult( qfu( new_val.psz_string ) );
+
+    return VLC_SUCCESS;
+}
+
 static int MetaUpdateCB( vlc_object_t *, const char *,
                          vlc_value_t, vlc_value_t new_val, void *param )
 {

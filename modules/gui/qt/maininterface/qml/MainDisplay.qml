@@ -112,7 +112,7 @@ FocusScope {
         active: false
         anchors.fill: parent
         z: 1000
-        source: "qrc:///qt/qml/VLC/MediaLibrary/FlixStoragePage.qml"
+        source: "qrc:///qt/qml/VLC/MediaLibrary/FlixSettingsPage.qml"
     }
 
     readonly property var pageModel: [

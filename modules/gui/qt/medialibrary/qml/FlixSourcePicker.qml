@@ -437,7 +437,8 @@ Item {
 
             Text {
                 anchors.centerIn: parent
-                text: "✕"
+                text: VLCIcons.close
+                font.family: VLCIcons.fontFamily
                 color: "#FFFFFF"
                 font.pixelSize: VLCStyle.dp(15, VLCStyle.scale)
             }
@@ -677,7 +678,8 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     enabled: root.selected !== null
                     opacity: enabled ? 1.0 : 0.4
-                    width: streamLabel.implicitWidth + 2 * VLCStyle.dp(26, VLCStyle.scale)
+                    width: streamLabel.implicitWidth + streamIcon.implicitWidth + VLCStyle.dp(8, VLCStyle.scale)
+                           + 2 * VLCStyle.dp(26, VLCStyle.scale)
                     height: VLCStyle.dp(42, VLCStyle.scale)
                     radius: VLCStyle.dp(4, VLCStyle.scale)
                     color: streamHover.hovered ? "#BFBFBF" : "#FFFFFF"
@@ -687,10 +689,23 @@ Item {
                     Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
                     Text {
+                        id: streamIcon
+
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.right: streamLabel.left
+                        anchors.rightMargin: VLCStyle.dp(8, VLCStyle.scale)
+                        text: VLCIcons.play_filled
+                        font.family: VLCIcons.fontFamily
+                        color: "#141414"
+                        font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
+                    }
+
+                    Text {
                         id: streamLabel
 
                         anchors.centerIn: parent
-                        text: "▶  " + qsTr("Stream this source")
+                        anchors.horizontalCenterOffset: (streamIcon.implicitWidth + VLCStyle.dp(8, VLCStyle.scale)) / 2
+                        text: qsTr("Stream this source")
                         color: "#141414"
                         font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
                         font.weight: Font.Bold

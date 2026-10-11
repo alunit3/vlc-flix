@@ -61,6 +61,25 @@ Rectangle {
         Player.position = target
         MainCtx.resumeFraction = 0
         MainCtx.resumeNotice = Math.round(target * total)
+        // a stream can drop the first seek (data not there yet): check once, a few seconds later
+        verifyTarget = target
+        verifyTimer.restart()
+    }
+
+    property real verifyTarget: 0
+
+    Timer {
+        id: verifyTimer
+
+        interval: 4000
+        onTriggered: {
+            const total = Player.length.toSeconds()
+            if (root.verifyTarget > 0 && total > 0 && Player.seekable
+                    && Player.position < root.verifyTarget - 10 / total) {
+                Player.position = root.verifyTarget
+            }
+            root.verifyTarget = 0
+        }
     }
 
     onPendingSeekChanged: {

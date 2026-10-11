@@ -211,6 +211,8 @@ function Client:login(user, password)
         self.base = base .. "/api/v1"
     end
     self.token = result.token
+    -- account details, for "logged in as ..." messages
+    self.account = type(result.user) == "table" and result.user or nil
     return true
 end
 

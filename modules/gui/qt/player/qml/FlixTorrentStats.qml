@@ -86,10 +86,10 @@ Rectangle {
 
         visible: root.hidden
         anchors.centerIn: parent
-        text: "↓↑"
+        text: VLCIcons.ic_fluent_arrow_download_24_regular
+        font.family: VLCIcons.fontFamily
         color: "#B3B3B3"
-        font.pixelSize: VLCStyle.dp(12, VLCStyle.scale)
-        font.weight: Font.DemiBold
+        font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
     }
 
     Column {
@@ -104,18 +104,45 @@ Rectangle {
         Row {
             spacing: VLCStyle.dp(14, VLCStyle.scale)
 
-            Text {
-                text: "↓ " + root._speed(root.stats.speedBps)
-                color: "#34D399"
-                font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
-                font.weight: Font.DemiBold
+            Row {
+                spacing: VLCStyle.dp(3, VLCStyle.scale)
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: VLCIcons.ic_fluent_arrow_download_24_regular
+                    font.family: VLCIcons.fontFamily
+                    color: "#34D399"
+                    font.pixelSize: VLCStyle.dp(15, VLCStyle.scale)
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root._speed(root.stats.speedBps)
+                    color: "#34D399"
+                    font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
+                    font.weight: Font.DemiBold
+                }
             }
 
-            Text {
-                text: "↑ " + root._speed(root.stats.upBps)
-                color: "#60A5FA"
-                font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
-                font.weight: Font.DemiBold
+            Row {
+                spacing: VLCStyle.dp(3, VLCStyle.scale)
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: VLCIcons.ic_fluent_arrow_download_24_regular
+                    font.family: VLCIcons.fontFamily
+                    rotation: 180
+                    color: "#60A5FA"
+                    font.pixelSize: VLCStyle.dp(15, VLCStyle.scale)
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root._speed(root.stats.upBps)
+                    color: "#60A5FA"
+                    font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
+                    font.weight: Font.DemiBold
+                }
             }
 
             Text {
@@ -152,7 +179,8 @@ Rectangle {
 
         Text {
             anchors.centerIn: parent
-            text: "✕"
+            text: VLCIcons.close
+            font.family: VLCIcons.fontFamily
             color: "#E5E5E5"
             font.pixelSize: VLCStyle.dp(9, VLCStyle.scale)
         }

@@ -88,6 +88,7 @@
 #include <QJsonObject>
 #include <QDesktopServices>
 #include <QDateTime>
+#include <QFileDialog>
 #include <QRegularExpression>
 #endif
 
@@ -745,6 +746,11 @@ static QVariantMap metaRecordToMap( const QJsonObject &o, const QString &directo
     m.insert( QStringLiteral("poster"), metaFileUrl( directory, o.value( QStringLiteral("poster") ).toString() ) );
     m.insert( QStringLiteral("backdrop"), metaFileUrl( directory, o.value( QStringLiteral("backdrop") ).toString() ) );
     return m;
+}
+
+QUrl MainCtx::pickFolder(const QString &title) const
+{
+    return QFileDialog::getExistingDirectoryUrl( nullptr, title, QUrl() );
 }
 
 bool MainCtx::metaEnabled() const

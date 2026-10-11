@@ -51,6 +51,13 @@ Widgets.PageExt {
 
     readonly property var _rows: [continueRow, recentRow, favoritesRow, allRow]
 
+    // flix: the library folders; "Add movie folder" adds to them (the scan starts by itself)
+    MLFolderModel {
+        id: libraryFolders
+
+        ctx: MainCtx
+    }
+
     // flix: "More Info" details of the billboard title
     FlixMoreInfo {
         id: moreInfo
@@ -182,7 +189,11 @@ Widgets.PageExt {
                 width: parent.width
                 sideMargin: root.sideMargin
                 empty: allRow.count === 0
-                onAddFolder: DialogsProvider.prefsDialog()
+                onAddFolder: {
+                    const folder = MainCtx.pickFolder(qsTr("Choose the folder with your movies and series"))
+                    if (folder.toString() !== "")
+                        libraryFolders.add(folder)
+                }
             }
 
             FlixRow {

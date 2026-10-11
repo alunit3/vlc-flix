@@ -428,6 +428,8 @@ public:
     Q_INVOKABLE QVariantList topTen() const;
     // flix: true when a TMDB token is configured
     Q_INVOKABLE bool metaEnabled() const;
+    // flix: folder chooser for "Add movie folder"; an empty url when cancelled
+    Q_INVOKABLE QUrl pickFolder(const QString &title) const;
 
     // Online search (TMDB discover / search). params: type ("movie"|"tv"), query, sort, genres
     // ("28,12"), year_from, year_to, min_rating, page. Returns {ready, items, page, totalPages};

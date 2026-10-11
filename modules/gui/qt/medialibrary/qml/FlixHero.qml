@@ -237,7 +237,12 @@ Item {
                     TapHandler {
                         onTapped: {
                             if (slide.model.id !== undefined) {
-                                MediaLib.addAndPlay(slide.model.id)
+                                const p = slide.model.progress ?? 0
+                                const d = slide.model.duration
+                                const secs = (d && d.valid()) ? d.toSeconds() : 0
+                                const start = (p > 0.03 && p < 0.95 && secs > 0) ? Math.max(0, Math.round(p * secs) - 5) : 0
+                                MediaLib.addAndPlay(slide.model.id, start > 0 ? ["start-time=" + start] : [])
+                                MainCtx.resumeNotice = start
                                 MainCtx.playerView = true
                             }
                         }
@@ -281,7 +286,8 @@ Item {
                             id: slide.model.id,
                             title: slide.model.title,
                             duration: slide.model.duration,
-                            thumbnail: slide.model.thumbnail
+                            thumbnail: slide.model.thumbnail,
+                            progress: slide.model.progress ?? 0
                         })
                     }
                 }

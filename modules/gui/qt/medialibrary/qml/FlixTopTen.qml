@@ -21,13 +21,16 @@ import VLC.MainInterface
 import VLC.Style
 
 // flix: "Top 10 this week": the movies TMDB reports as trending, with big rank numerals.
-// A click opens the title's page in the browser (see flix-top10-target in Preferences).
+// A click opens its More Info card (IMDb / Heartive buttons).
 Item {
     id: root
 
     property real sideMargin: VLCStyle.dp(48, VLCStyle.scale)
 
     property var items: []
+
+    // a click opens More Info (IMDb / Heartive buttons) instead of the browser
+    signal infoRequested(var item)
 
     function reload() {
         items = MainCtx.topTen()
@@ -124,14 +127,8 @@ Item {
 
                 HoverHandler { id: tap; cursorShape: Qt.PointingHandCursor }
 
-                // left click: the configured page, right click: IMDb
                 TapHandler {
-                    acceptedButtons: Qt.LeftButton
-                    onTapped: MainCtx.openExternal(MainCtx.topTenUrl(entry.modelData.imdbId))
-                }
-                TapHandler {
-                    acceptedButtons: Qt.RightButton
-                    onTapped: MainCtx.openExternal(MainCtx.imdbUrl(entry.modelData.imdbId))
+                    onTapped: root.infoRequested(entry.modelData)
                 }
             }
 

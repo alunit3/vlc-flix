@@ -1813,7 +1813,7 @@ vlc_module_begin ()
                  SUB_PATH_TEXT, SUB_PATH_LONGTEXT )
     add_integer( "sub-margin", 0, SUB_MARGIN_TEXT,
                  SUB_MARGIN_LONGTEXT )
-    add_integer_with_range( "sub-text-scale", 115, 10, 500,
+    add_integer_with_range( "sub-text-scale", 90, 10, 500,
                SUB_TEXT_SCALE_TEXT, SUB_TEXT_SCALE_LONGTEXT )
     set_section( N_( "Overlays" ) , NULL )
     add_module_list("sub-source", "sub source", NULL,

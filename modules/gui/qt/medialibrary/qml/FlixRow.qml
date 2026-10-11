@@ -43,6 +43,7 @@ FocusScope {
     property Flickable pageFlickable: null
 
     signal seeAllClicked()
+    signal infoRequested(var item)
     signal moveUp()
     signal moveDown()
 
@@ -139,9 +140,15 @@ FocusScope {
 
             onActivated: {
                 list.currentIndex = index
+                // a click opens "More Info"; playing / resuming happens from there
                 if (model.id !== undefined) {
-                    MediaLib.addAndPlay(model.id)
-                    MainCtx.playerView = true
+                    root.infoRequested({
+                        id: model.id,
+                        title: model.title,
+                        duration: model.duration,
+                        thumbnail: model.thumbnail,
+                        progress: model.progress ?? 0
+                    })
                 }
             }
         }

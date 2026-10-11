@@ -10,6 +10,8 @@ Behaviour:
   GET /3/search/movie|tv        -> "Chappie" (2015) for query "chappie", nothing otherwise
   GET /3/movie/<id>|/tv/<id>    -> details with external_ids (imdb_id)
   GET /3/trending/movie/week    -> ten movies
+  GET /3/discover/movie|tv      -> 45 generated titles (sort_by, with_genres, date and rating filters, page)
+  GET /3/genre/movie|tv/list    -> a few genres
   GET /t/p/<size>/<file>        -> a small generated picture
 All endpoints under /3 need "Authorization: Bearer testtoken". Every request is logged as a
 JSON line (path, query, authorization).
@@ -31,6 +33,18 @@ MOVIES = {
 for n in range(1, 11):
     MOVIES[n] = ("Trending Movie %d" % n, "2026-0%d-01" % (n % 9 + 1),
                  "Synopsis of trending movie %d." % n, "", 90 + n, ["Drama"], "tt%07d" % (7000000 + n))
+
+
+GENRES = {28: "Action", 35: "Comedy", 18: "Drama", 878: "Science Fiction", 27: "Horror"}
+GENRE_IDS = list(GENRES)
+for n in range(1, 46):
+    year = 1980 + n
+    MOVIES[300 + n] = ("Discover Movie %d" % n, "%d-06-15" % year, "Synopsis of discover movie %d." % n,
+                       "", 80 + n, [GENRES[GENRE_IDS[n % 5]]], "tt%07d" % (8000000 + n))
+
+
+def genre_ids(movie_id):
+    return [GENRE_IDS[movie_id % 5]] if movie_id > 300 else [18]
 
 
 def png(width, height, rgb):
@@ -57,6 +71,8 @@ def detail(movie_id):
         "genres": [{"id": i, "name": g} for i, g in enumerate(genres)],
         "poster_path": "/poster%d.jpg" % movie_id, "backdrop_path": "/backdrop%d.jpg" % movie_id,
         "imdb_id": imdb, "external_ids": {"imdb_id": imdb},
+        "genre_ids": genre_ids(movie_id), "popularity": 100.0 - movie_id % 50,
+        "first_air_date": date,
     }
 
 
@@ -96,8 +112,31 @@ def make_handler(log_path):
             parts = url.path[3:].strip("/").split("/")
             if parts[0] == "search":
                 wanted = query.get("query", "").lower()
-                hits = [detail(201)] if wanted == "chappie" else []
+                hits = [detail(201)] if wanted == "chappie" else (
+                    [detail(i) for i in range(301, 346)] if wanted == "discover" else [])
                 return self._send(200, {"page": 1, "results": hits})
+            if parts[0] == "genre" and len(parts) == 3:
+                return self._send(200, {"genres": [{"id": i, "name": n} for i, n in GENRES.items()]})
+            if parts[0] == "discover":
+                rows = [detail(i) for i in range(301, 346)]
+                gens = [int(g) for g in query.get("with_genres", "").replace("|", ",").split(",") if g]
+                if gens:
+                    rows = [r for r in rows if set(r["genre_ids"]) & set(gens)]
+                for key in ("primary_release_date.gte", "first_air_date.gte"):
+                    if key in query:
+                        rows = [r for r in rows if r["release_date"] >= query[key]]
+                for key in ("primary_release_date.lte", "first_air_date.lte"):
+                    if key in query:
+                        rows = [r for r in rows if r["release_date"] <= query[key]]
+                if "vote_average.gte" in query:
+                    rows = [r for r in rows if r["vote_average"] >= float(query["vote_average.gte"])]
+                sort = query.get("sort_by", "popularity.desc")
+                field = {"popularity": "popularity", "primary_release_date": "release_date",
+                         "first_air_date": "release_date", "vote_average": "vote_average"}.get(sort.split(".")[0], "popularity")
+                rows.sort(key=lambda r: r[field], reverse=sort.endswith(".desc"))
+                page = int(query.get("page", "1"))
+                return self._send(200, {"page": page, "total_pages": max(1, (len(rows) + 19) // 20),
+                                        "results": rows[(page - 1) * 20:page * 20]})
             if parts == ["trending", "movie", "week"]:
                 return self._send(200, {"page": 1, "results": [detail(n) for n in range(1, 11)]})
             if parts[0] in ("movie", "tv") and len(parts) == 2 and parts[1].isdigit() \

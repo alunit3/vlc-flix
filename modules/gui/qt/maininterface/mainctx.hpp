@@ -144,6 +144,8 @@ class MainCtx : public QObject
 
     // Expose Property Minimal View for Player View
     Q_PROPERTY(bool minimalView READ isMinimalView WRITE setMinimalView NOTIFY mainInterfaceModesChanged FINAL)
+    // flix: seconds a title was just resumed from (0: nothing to announce), see FlixResumeToast
+    Q_PROPERTY(int resumeNotice MEMBER m_resumeNotice NOTIFY resumeNoticeChanged FINAL)
     Q_PROPERTY(bool playerView READ isPlayerView WRITE setPlayerView NOTIFY mainInterfaceModesChanged FINAL)
 
     // This Property only works if hasAcrylicSurface is set
@@ -426,6 +428,15 @@ public:
     Q_INVOKABLE QVariantList topTen() const;
     // flix: true when a TMDB token is configured
     Q_INVOKABLE bool metaEnabled() const;
+
+    // Online search (TMDB discover / search). params: type ("movie"|"tv"), query, sort, genres
+    // ("28,12"), year_from, year_to, min_rating, page. Returns {ready, items, page, totalPages};
+    // while not ready the request is queued and metaUpdated(key) follows.
+    Q_INVOKABLE QVariantMap discover(const QVariantMap &params);
+    // [{id, name}] genre names of "movie" or "tv" in the chosen language (empty until fetched)
+    Q_INVOKABLE QVariantList genres(const QString &type) const;
+    // details (IMDb id, backdrop, tagline, runtime...) of an online title; empty until fetched
+    Q_INVOKABLE QVariantMap webDetail(int tmdbId, const QString &type);
     // flix: page for an IMDb id: the torrents site or IMDb, per the flix-top10-target option
     Q_INVOKABLE QUrl topTenUrl(const QString &imdbId) const;
     Q_INVOKABLE QUrl imdbUrl(const QString &imdbId) const;
@@ -535,7 +546,9 @@ protected:
     // flix: metadata requests waiting to be handed to the Lua service
     QVariantMap m_metaPending;
     QTimer *m_metaTimer = nullptr;
+    int m_resumeNotice = 0;
     void flushMetaRequests();
+    void queueMeta(const QString &key, const QVariantMap &req);
 
 public slots:
     void toggleToolbarMenu();
@@ -649,6 +662,7 @@ signals:
     void artistAlbumsWidthChanged( double );
 
     void mainInterfaceModesChanged(MainInterfaceModes);
+    void resumeNoticeChanged(int);
 
     void usingTouchChanged();
 

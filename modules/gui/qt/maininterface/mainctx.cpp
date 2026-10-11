@@ -83,6 +83,7 @@
 #include <QFile>
 #include <QDir>
 #include <QJsonDocument>
+#include <QCryptographicHash>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QDesktopServices>
@@ -739,6 +740,7 @@ static QVariantMap metaRecordToMap( const QJsonObject &o, const QString &directo
     m.insert( QStringLiteral("rating"), o.value( QStringLiteral("rating") ).toDouble() );
     m.insert( QStringLiteral("imdbId"), o.value( QStringLiteral("imdb_id") ).toString() );
     m.insert( QStringLiteral("mediaType"), o.value( QStringLiteral("media_type") ).toString() );
+    m.insert( QStringLiteral("tmdbId"), o.value( QStringLiteral("tmdb_id") ).toInt() );
     m.insert( QStringLiteral("genres"), o.value( QStringLiteral("genres") ).toArray().toVariantList() );
     m.insert( QStringLiteral("poster"), metaFileUrl( directory, o.value( QStringLiteral("poster") ).toString() ) );
     m.insert( QStringLiteral("backdrop"), metaFileUrl( directory, o.value( QStringLiteral("backdrop") ).toString() ) );
@@ -827,6 +829,158 @@ void MainCtx::flushMetaRequests()
         list.append( QJsonObject::fromVariantMap( req.toMap() ) );
     m_metaPending.clear();
     var_SetString( libvlc, "flix-meta-request", QJsonDocument( list ).toJson( QJsonDocument::Compact ).constData() );
+}
+
+static QString metaLanguage( qt_intf_t *intf )
+{
+    char *lang = var_InheritString( intf, "flix-meta-language" );
+    const QString language = lang && lang[0] ? qfu( lang ) : QStringLiteral("en-US");
+    free( lang );
+    return language;
+}
+
+void MainCtx::queueMeta(const QString &key, const QVariantMap &req)
+{
+    if( m_metaPending.contains( key ) )
+        return;
+    m_metaPending.insert( key, req );
+    if( !m_metaTimer )
+    {
+        m_metaTimer = new QTimer( this );
+        m_metaTimer->setSingleShot( true );
+        connect( m_metaTimer, &QTimer::timeout, this, &MainCtx::flushMetaRequests );
+    }
+    m_metaTimer->start( 300 );
+}
+
+static QHash<int, QString> genreNames( const QString &directory, const QString &type )
+{
+    QHash<int, QString> names;
+    QFile file( directory + QStringLiteral("/genres.json") );
+    if( !file.open( QIODevice::ReadOnly ) )
+        return names;
+    const QJsonArray list = QJsonDocument::fromJson( file.readAll() ).object().value( type ).toArray();
+    for( const QJsonValue &v : list )
+        names.insert( v.toObject().value( QStringLiteral("id") ).toInt(),
+                      v.toObject().value( QStringLiteral("name") ).toString() );
+    return names;
+}
+
+QVariantList MainCtx::genres(const QString &type) const
+{
+    QVariantList result;
+    QFile file( metaDirectory() + QStringLiteral("/genres.json") );
+    if( !file.open( QIODevice::ReadOnly ) )
+        return result;
+    const QJsonArray list = QJsonDocument::fromJson( file.readAll() ).object()
+        .value( type == QLatin1String("tv") ? QStringLiteral("tv") : QStringLiteral("movie") ).toArray();
+    for( const QJsonValue &v : list )
+    {
+        QVariantMap g;
+        g.insert( QStringLiteral("id"), v.toObject().value( QStringLiteral("id") ).toInt() );
+        g.insert( QStringLiteral("name"), v.toObject().value( QStringLiteral("name") ).toString() );
+        result.append( g );
+    }
+    return result;
+}
+
+QVariantMap MainCtx::discover(const QVariantMap &params)
+{
+    QVariantMap result;
+    result.insert( QStringLiteral("ready"), false );
+    result.insert( QStringLiteral("items"), QVariantList() );
+    result.insert( QStringLiteral("page"), 1 );
+    result.insert( QStringLiteral("totalPages"), 1 );
+    if( !metaEnabled() )
+        return result;
+
+    const QString language = metaLanguage( p_intf );
+    const QString type = params.value( QStringLiteral("type") ).toString() == QLatin1String("tv")
+                       ? QStringLiteral("tv") : QStringLiteral("movie");
+
+    // the key names the cache file: same search and language, same file
+    const QByteArray canonical = QJsonDocument( QJsonObject::fromVariantMap( params ) ).toJson( QJsonDocument::Compact )
+                               + language.toUtf8();
+    const QString key = QStringLiteral("d-") + QString::fromLatin1(
+        QCryptographicHash::hash( canonical, QCryptographicHash::Sha1 ).toHex().left( 20 ) );
+
+    const QString directory = metaDirectory();
+    QFile file( directory + QStringLiteral("/discover/") + key + QStringLiteral(".json") );
+    bool refresh = true;
+    if( file.open( QIODevice::ReadOnly ) )
+    {
+        const QJsonObject o = QJsonDocument::fromJson( file.readAll() ).object();
+        file.close();
+        if( !o.isEmpty() )
+        {
+            const qint64 age = QDateTime::currentSecsSinceEpoch() - qint64( o.value( QStringLiteral("fetched") ).toDouble() );
+            refresh = age > 6 * 3600;
+            const QHash<int, QString> names = genreNames( directory, type );
+            QVariantList items;
+            for( const QJsonValue &v : o.value( QStringLiteral("items") ).toArray() )
+            {
+                const QJsonObject r = v.toObject();
+                QVariantMap m;
+                m.insert( QStringLiteral("tmdbId"), r.value( QStringLiteral("tmdb_id") ).toInt() );
+                m.insert( QStringLiteral("mediaType"), r.value( QStringLiteral("media_type") ).toString() );
+                m.insert( QStringLiteral("title"), r.value( QStringLiteral("title") ).toString() );
+                m.insert( QStringLiteral("year"), r.value( QStringLiteral("year") ).toInt() );
+                m.insert( QStringLiteral("overview"), r.value( QStringLiteral("overview") ).toString() );
+                m.insert( QStringLiteral("rating"), r.value( QStringLiteral("rating") ).toDouble() );
+                m.insert( QStringLiteral("poster"), metaFileUrl( directory, r.value( QStringLiteral("poster") ).toString() ) );
+                m.insert( QStringLiteral("backdrop"), QString() );
+                m.insert( QStringLiteral("imdbId"), QString() );
+                QStringList genreList;
+                for( const QJsonValue &g : r.value( QStringLiteral("genre_ids") ).toArray() )
+                    if( names.contains( g.toInt() ) )
+                        genreList << names.value( g.toInt() );
+                m.insert( QStringLiteral("genres"), genreList );
+                items.append( m );
+            }
+            result.insert( QStringLiteral("ready"), true );
+            result.insert( QStringLiteral("items"), items );
+            result.insert( QStringLiteral("page"), o.value( QStringLiteral("page") ).toInt( 1 ) );
+            result.insert( QStringLiteral("totalPages"), o.value( QStringLiteral("total_pages") ).toInt( 1 ) );
+        }
+    }
+
+    if( refresh )
+    {
+        QVariantMap req;
+        req.insert( QStringLiteral("key"), key );
+        req.insert( QStringLiteral("kind"), QStringLiteral("discover") );
+        req.insert( QStringLiteral("params"), params );
+        queueMeta( key, req );
+    }
+    return result;
+}
+
+QVariantMap MainCtx::webDetail(int tmdbId, const QString &type)
+{
+    if( tmdbId <= 0 || !metaEnabled() )
+        return {};
+
+    const QString kind = type == QLatin1String("tv") ? QStringLiteral("tv") : QStringLiteral("movie");
+    const QString key = QStringLiteral("w-%1-%2-%3").arg( kind ).arg( tmdbId ).arg( metaLanguage( p_intf ).toLower() );
+
+    const QString directory = metaDirectory();
+    QFile file( directory + QStringLiteral("/movie/") + key + QStringLiteral(".json") );
+    if( file.open( QIODevice::ReadOnly ) )
+    {
+        const QJsonObject o = QJsonDocument::fromJson( file.readAll() ).object();
+        file.close();
+        const qint64 age = QDateTime::currentSecsSinceEpoch() - qint64( o.value( QStringLiteral("fetched") ).toDouble() );
+        if( !o.isEmpty() && age < 30 * 86400 )
+            return metaRecordToMap( o, directory );
+    }
+
+    QVariantMap req;
+    req.insert( QStringLiteral("key"), key );
+    req.insert( QStringLiteral("kind"), QStringLiteral("detail") );
+    req.insert( QStringLiteral("tmdb_id"), tmdbId );
+    req.insert( QStringLiteral("type"), kind );
+    queueMeta( key, req );
+    return {};
 }
 
 QVariantList MainCtx::topTen() const

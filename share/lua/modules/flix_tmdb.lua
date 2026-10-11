@@ -5,6 +5,8 @@
    movie/<key>.json   overview, genres, runtime, rating, IMDb id, poster and backdrop paths
    posters/, backdrops/   the images
    top10.json         the movies that are trending this week
+   discover/<key>.json   search / discover results (sorted, filtered) with posters
+   genres.json        TMDB genre names in the chosen language
  The interface asks for titles through the libvlc variable "flix-meta-request" and is told
  about new data through "flix-meta-update" (see flixsubs.lua, which drives this module).
 
@@ -55,7 +57,7 @@ function Service:path(...)
 end
 
 function Service:prepare()
-    for _, sub in ipairs({ "", "movie", "posters", "backdrops" }) do
+    for _, sub in ipairs({ "", "movie", "posters", "backdrops", "discover" }) do
         pcall(vlc.io.mkdir, sub == "" and self.dir or self:path(sub), "0700")
     end
 end
@@ -257,6 +259,147 @@ function Service:top10()
 end
 
 ------------------------------------------------------------------------------
+-- discover / search / details of online titles
+------------------------------------------------------------------------------
+
+local MOVIE_SORTS = {
+    ["popularity.desc"] = "popularity.desc",
+    ["popularity.asc"] = "popularity.asc",
+    ["date.desc"] = "primary_release_date.desc",
+    ["date.asc"] = "primary_release_date.asc",
+    ["rating.desc"] = "vote_average.desc",
+    ["rating.asc"] = "vote_average.asc",
+    ["title.asc"] = "original_title.asc",
+    ["revenue.desc"] = "revenue.desc",
+}
+local TV_SORTS = {
+    ["popularity.desc"] = "popularity.desc",
+    ["popularity.asc"] = "popularity.asc",
+    ["date.desc"] = "first_air_date.desc",
+    ["date.asc"] = "first_air_date.asc",
+    ["rating.desc"] = "vote_average.desc",
+    ["rating.asc"] = "vote_average.asc",
+    ["title.asc"] = "name.asc",
+    ["revenue.desc"] = "popularity.desc",
+}
+
+-- sorts the items of a search page (the search endpoint cannot sort)
+local function sort_items(items, sort)
+    local field, direction = tostring(sort or ""):match("^(%a+)%.(%a+)$")
+    field = ({ popularity = "popularity", rating = "rating", date = "year", title = "title" })[field]
+    if not field then return end
+    local ascending = direction == "asc"
+    table.sort(items, function(a, b)
+        local x, y = a[field], b[field]
+        if field == "title" then x, y = tostring(x):lower(), tostring(y):lower() end
+        if x == y then return (a.popularity or 0) > (b.popularity or 0) end
+        if ascending then return x < y end
+        return x > y
+    end)
+end
+
+-- req.params: {type, query, sort, genres="28,12", year_from, year_to, min_rating, page}
+-- writes discover/<key>.json {items = {...}, page, total_pages}
+function Service:discover(req)
+    local p = type(req.params) == "table" and req.params or {}
+    local tv = p.type == "tv"
+    local kind = tv and "tv" or "movie"
+    local sorts = tv and TV_SORTS or MOVIE_SORTS
+    local sort = sorts[p.sort] or sorts["popularity.desc"]
+    local page = math.max(1, math.min(20, math.floor(tonumber(p.page) or 1)))
+    local year_from, year_to = tonumber(p.year_from) or 0, tonumber(p.year_to) or 0
+    local min_rating = tonumber(p.min_rating) or 0
+    local genres = tostring(p.genres or ""):match("^[%d,|]+$") or ""
+    local query = type(p.query) == "string" and p.query or ""
+
+    local answer, err
+    if query ~= "" then
+        answer, err = self:get("/search/" .. kind, {
+            query = query, language = self.language, include_adult = "false", page = page })
+    else
+        local date = tv and "first_air_date" or "primary_release_date"
+        local params = {
+            language = self.language, include_adult = "false", page = page, sort_by = sort,
+            ["vote_count.gte"] = sort:match("^vote_average") and 300 or 30,
+        }
+        if genres ~= "" then params.with_genres = genres end
+        if year_from > 0 then params[date .. ".gte"] = string.format("%04d-01-01", year_from) end
+        if year_to > 0 then params[date .. ".lte"] = string.format("%04d-12-31", year_to) end
+        if min_rating > 0 then params["vote_average.gte"] = min_rating end
+        answer, err = self:get("/discover/" .. kind, params)
+    end
+    if not answer then return nil, err end
+
+    local wanted = {}
+    for id in genres:gmatch("%d+") do wanted[tonumber(id)] = true end
+    local has_wanted = next(wanted) ~= nil
+
+    local items = {}
+    for _, row in ipairs(answer.results or {}) do
+        local date = row.release_date or row.first_air_date or ""
+        local year = tonumber(date:match("^(%d%d%d%d)")) or 0
+        local keep = true
+        if query ~= "" then                     -- a search cannot be filtered on the server
+            if year_from > 0 and year < year_from then keep = false end
+            if year_to > 0 and year > year_to then keep = false end
+            if min_rating > 0 and (tonumber(row.vote_average) or 0) < min_rating then keep = false end
+            if has_wanted then
+                keep = false
+                for _, g in ipairs(row.genre_ids or {}) do
+                    if wanted[g] then keep = true break end
+                end
+            end
+        end
+        if keep then
+            items[#items + 1] = {
+                tmdb_id = row.id, media_type = kind,
+                title = row.title or row.name, year = year,
+                overview = row.overview or "", genre_ids = row.genre_ids or {},
+                rating = tonumber(row.vote_average) or 0,
+                popularity = tonumber(row.popularity) or 0,
+                poster = self:image("posters", "w342", row.poster_path, kind .. tostring(row.id)),
+            }
+        end
+    end
+    if query ~= "" then sort_items(items, p.sort) end
+
+    local doc = { key = req.key, fetched = now(), language = self.language, page = page,
+                  total_pages = tonumber(answer.total_pages) or 1, items = items }
+    if not write_file(self:path("discover", req.key .. ".json"), json.encode(doc)) then
+        return nil, "save_failed"
+    end
+    return true
+end
+
+-- full details (IMDb id, backdrop, tagline...) of one online title into movie/<key>.json
+function Service:detail(req)
+    local kind = req.type == "tv" and "tv" or "movie"
+    local id = tonumber(req.tmdb_id)
+    if not id then return nil, "bad_request" end
+    local d, e = self:get("/" .. kind .. "/" .. tostring(math.floor(id)),
+        { language = self.language, append_to_response = "external_ids" })
+    if not d then return nil, e end
+    local record = self:record(kind, d)
+    record.key = req.key
+    if not write_file(self:path("movie", req.key .. ".json"), json.encode(record)) then
+        return nil, "save_failed"
+    end
+    return true
+end
+
+-- genre names (movie + tv) in the chosen language into genres.json
+function Service:genres()
+    local doc = { language = self.language, fetched = now() }
+    for _, kind in ipairs({ "movie", "tv" }) do
+        local d, e = self:get("/genre/" .. kind .. "/list", { language = self.language })
+        if not d then return nil, e end
+        doc[kind] = d.genres or {}
+    end
+    if not write_file(self:path("genres.json"), json.encode(doc)) then return nil, "save_failed" end
+    return true
+end
+
+------------------------------------------------------------------------------
 -- queue
 ------------------------------------------------------------------------------
 
@@ -266,10 +409,15 @@ function Service:enqueue(text)
     if type(list) ~= "table" then return end
     for _, req in ipairs(list) do
         if type(req) == "table" and type(req.key) == "string"
-            and req.key:match("^[%w%-_]+$") and type(req.title) == "string"
-            and req.title ~= "" and not self.queued[req.key] and #self.queue < MAX_QUEUE then
-            self.queued[req.key] = true
-            self.queue[#self.queue + 1] = req
+            and req.key:match("^[%w%-_]+$") and not self.queued[req.key] and #self.queue < MAX_QUEUE then
+            if req.kind == "discover" or req.kind == "detail" then
+                -- the user is waiting for these: before the background lookups
+                self.queued[req.key] = true
+                table.insert(self.queue, 1, req)
+            elseif type(req.title) == "string" and req.title ~= "" then
+                self.queued[req.key] = true
+                self.queue[#self.queue + 1] = req
+            end
         end
     end
 end
@@ -281,12 +429,20 @@ function Service:step()
     local req = table.remove(self.queue, 1)
     if req then
         self.queued[req.key] = nil
-        local ok, err = self:lookup(req)
+        local run = req.kind == "discover" and self.discover
+                    or req.kind == "detail" and self.detail or self.lookup
+        local ok, err = run(self, req)
         if ok then return req.key end
         if err == "rate_limit" then
             self.queue[#self.queue + 1] = req           -- try again later
             self.queued[req.key] = true
         end
+        return nil, err
+    end
+    if not self.genres_done then
+        self.genres_done = true                         -- once per session, a failure is not retried
+        local ok, err = self:genres()
+        if ok then return "genres" end
         return nil, err
     end
     if now() - self.top10_at > TOP10_AGE then

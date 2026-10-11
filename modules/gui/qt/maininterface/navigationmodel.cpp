@@ -267,6 +267,8 @@ public:
     {
         m_model.children.emplace_back(qtr("Home"), "home", VLCIcons::home, QStringLiteral(":/icons/ic_fluent_home.svg"));
 
+        m_model.children.emplace_back(qtr("Search"), "flixsearch", VLCIcons::search, QStringLiteral(":/icons/ic_fluent_search.svg"));
+
         if (m_hasMedialib)
         {
             ModelEntry videoEntry{ qtr("Video"), "video", VLCIcons::topbar_video, QStringLiteral(":/icons/ic_fluent_filmstrip.svg") };

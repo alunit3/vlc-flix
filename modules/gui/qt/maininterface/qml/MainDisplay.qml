@@ -112,6 +112,9 @@ FocusScope {
                  "qrc:///qt/qml/VLC/MediaLibrary/HomeDisplay.qml" :
                  "qrc:///qt/qml/VLC/MainInterface/NoMedialibHome.qml"
         }, {
+            name: "flixsearch",
+            url: "qrc:///qt/qml/VLC/MediaLibrary/FlixSearchDisplay.qml"
+        }, {
             name: "video",
             url: "qrc:///qt/qml/VLC/MediaLibrary/VideoDisplay.qml"
         }, {

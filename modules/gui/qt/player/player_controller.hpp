@@ -167,6 +167,7 @@ public:
     Q_PROPERTY(VLCDuration subtitleDelay READ getSubtitleDelay WRITE setSubtitleDelay NOTIFY subtitleDelayChanged FINAL)
     Q_PROPERTY(VLCDuration secondarySubtitleDelay READ getSecondarySubtitleDelay WRITE setSecondarySubtitleDelay NOTIFY secondarySubtitleDelayChanged FINAL)
     Q_PROPERTY(int audioDelayMS READ getAudioDelayMS WRITE setAudioDelayMS NOTIFY audioDelayChanged FINAL)
+    Q_PROPERTY(int subtitleTextScale READ getSubtitleTextScale WRITE setSubtitleTextScale NOTIFY subtitleTextScaleChanged FINAL)
     Q_PROPERTY(int subtitleDelayMS READ getSubtitleDelayMS WRITE setSubtitleDelayMS NOTIFY subtitleDelayChanged FINAL)
     Q_PROPERTY(int secondarySubtitleDelayMS READ getSecondarySubtitleDelayMS WRITE setSecondarySubtitleDelayMS NOTIFY secondarySubtitleDelayChanged FINAL)
     Q_PROPERTY(float subtitleFPS READ getSubtitleFPS WRITE setSubtitleFPS NOTIFY subtitleFPSChanged FINAL)
@@ -348,6 +349,10 @@ public slots:
     VLCDuration getSecondarySubtitleDelay() const;
     void setSubtitleDelay( VLCDuration );
     Q_INVOKABLE void addSubtitleDelay( VLCDuration );
+    // flix: subtitle size in percent (10-500), live; saveSubtitleTextScale() keeps it for the next start
+    int getSubtitleTextScale() const;
+    void setSubtitleTextScale( int );
+    Q_INVOKABLE void saveSubtitleTextScale();
     void setSecondarySubtitleDelay( VLCDuration );
     Q_INVOKABLE void addSecondarySubtitleDelay( VLCDuration );
     int getAudioDelayMS() const;
@@ -464,6 +469,7 @@ signals:
     //tracks
     void audioDelayChanged(VLCDuration);
     void subtitleDelayChanged(VLCDuration);
+    void subtitleTextScaleChanged(int);
     void secondarySubtitleDelayChanged(VLCDuration);
     void subtitleFPSChanged(float);
 

@@ -48,24 +48,79 @@ RowLayout {
 
     onActiveFocusChanged: if (activeFocus) playbackBtn.forceActiveFocus()
 
-    Widgets.ButtonExt {
-        id: playbackBtn
-
-        text: qsTr("%1x").arg(+Player.rate.toFixed(2))
-
-        onPressed: {
-            trackMenuController.requestPlaybackSpeedPage()
-        }
-
-        T.ToolTip.visible: (hovered || visualFocus)
-        T.ToolTip.text: qsTr("Playback Speed")
-        T.ToolTip.delay: VLCStyle.delayToolTipAppear
-
-        Navigation.parentItem: root
-        Navigation.rightItem: row
-
+    ColumnLayout {
         Layout.alignment: Qt.AlignTop | Qt.AlignLeft
         Layout.margins: VLCStyle.margin_large
+
+        spacing: VLCStyle.margin_small
+
+        Widgets.ButtonExt {
+            id: playbackBtn
+
+            text: qsTr("%1x").arg(+Player.rate.toFixed(2))
+
+            onPressed: {
+                trackMenuController.requestPlaybackSpeedPage()
+            }
+
+            T.ToolTip.visible: (hovered || visualFocus)
+            T.ToolTip.text: qsTr("Playback Speed")
+            T.ToolTip.delay: VLCStyle.delayToolTipAppear
+
+            Navigation.parentItem: root
+            Navigation.rightItem: row
+            Navigation.downItem: smallerSubs
+        }
+
+        // flix: subtitle size, applied live and kept for the next start
+        Row {
+            spacing: VLCStyle.margin_xxsmall
+
+            Widgets.ButtonExt {
+                id: smallerSubs
+
+                text: qsTr("A−")
+
+                onPressed: {
+                    Player.subtitleTextScale = Player.subtitleTextScale - 10
+                    Player.saveSubtitleTextScale()
+                }
+
+                T.ToolTip.visible: (hovered || visualFocus)
+                T.ToolTip.text: qsTr("Smaller subtitles")
+                T.ToolTip.delay: VLCStyle.delayToolTipAppear
+
+                Navigation.parentItem: root
+                Navigation.upItem: playbackBtn
+                Navigation.rightItem: biggerSubs
+            }
+
+            Widgets.ButtonExt {
+                id: biggerSubs
+
+                text: qsTr("A+")
+
+                onPressed: {
+                    Player.subtitleTextScale = Player.subtitleTextScale + 10
+                    Player.saveSubtitleTextScale()
+                }
+
+                T.ToolTip.visible: (hovered || visualFocus)
+                T.ToolTip.text: qsTr("Bigger subtitles")
+                T.ToolTip.delay: VLCStyle.delayToolTipAppear
+
+                Navigation.parentItem: root
+                Navigation.upItem: playbackBtn
+                Navigation.leftItem: smallerSubs
+                Navigation.rightItem: row
+            }
+        }
+
+        Text {
+            text: qsTr("Subtitle size %1%").arg(Player.subtitleTextScale)
+            color: theme.fg.secondary
+            font.pixelSize: VLCStyle.fontSize_small
+        }
     }
 
     Widgets.NavigableRow {

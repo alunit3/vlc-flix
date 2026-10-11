@@ -25,8 +25,12 @@ import VLC.Style
 Item {
     id: root
 
-    // {id, title, duration, thumbnail} of the library item, or null
+    // library item {id, title, duration, thumbnail, progress}, or an online title from
+    // Top 10 / search {title, year, overview, rating, genres, imdbId, poster, backdrop}, or null
     property var item: null
+
+    // an online title has no file to play: only the IMDb / Heartive buttons
+    readonly property bool isWeb: item !== null && item.id === undefined
 
     function open(entry) {
         item = entry
@@ -41,16 +45,65 @@ Item {
     z: 100
 
     readonly property string rawTitle: item ? (item.title ?? "") : ""
-    readonly property var info: MainCtx.releaseInfo(rawTitle)
+    readonly property var info: isWeb ? ({ isEpisode: false, year: item.year ?? 0, resolution: "" })
+                                      : MainCtx.releaseInfo(rawTitle)
+
+    // details fetched for an online title (movie/<key>.json); re-read when the service reports news
+    property int metaTick: 0
+
+    readonly property var extra: {
+        metaTick
+        return (isWeb && (item.tmdbId ?? 0) > 0)
+               ? MainCtx.webDetail(item.tmdbId, item.mediaType ?? "movie") : ({})
+    }
+
+    Connections {
+        target: MainCtx
+
+        function onMetaUpdated(key) {
+            if (root.isWeb && Object.keys(root.extra).length === 0)
+                root.metaTick++
+        }
+    }
+
+    readonly property var meta: isWeb ? Object.assign({}, item, extra.found ? extra : ({})) : tmdb.data
+    readonly property string backdropUrl: isWeb ? (extra.backdrop || item.backdrop || item.poster || "") : tmdb.backdrop
+    readonly property string overviewText: isWeb ? (extra.overview || item.overview || "") : tmdb.overview
+    readonly property var genreList: isWeb ? ((extra.genres ?? []).length > 0 ? extra.genres : (item.genres ?? [])) : tmdb.genres
+    readonly property string imdb: isWeb ? (extra.imdbId || item.imdbId || "") : tmdb.imdbId
+
+    // Netflix-style resume: 5 s back from where the user stopped, ignore the first 3 % and the last 5 %
+    readonly property real progress: (!isWeb && item) ? (item.progress ?? 0) : 0
+    readonly property int totalSeconds: (!isWeb && item && item.duration && item.duration.valid())
+                                        ? item.duration.toSeconds() : 0
+    readonly property int resumeSeconds: (progress > 0.03 && progress < 0.95 && totalSeconds > 0)
+                                         ? Math.max(0, Math.round(progress * totalSeconds) - 5) : 0
+
+    function _clock(seconds) {
+        const h = Math.floor(seconds / 3600)
+        const m = Math.floor(seconds % 3600 / 60)
+        const sec = seconds % 60
+        return (h > 0 ? h + ":" + String(m).padStart(2, "0") : String(m)) + ":" + String(sec).padStart(2, "0")
+    }
+
+    function play(fromStart) {
+        if (isWeb || !item || item.id === undefined)
+            return
+        const options = (!fromStart && resumeSeconds > 0) ? ["start-time=" + resumeSeconds] : []
+        MediaLib.addAndPlay(item.id, options)
+        MainCtx.resumeNotice = (!fromStart && resumeSeconds > 0) ? resumeSeconds : 0
+        MainCtx.playerView = true
+        close()
+    }
 
     FlixMeta {
         id: tmdb
 
-        name: root.rawTitle
+        name: root.isWeb ? "" : root.rawTitle
     }
 
     readonly property string runtimeText: {
-        let minutes = tmdb.data.runtime ?? 0
+        let minutes = root.meta.runtime ?? 0
         if (minutes <= 0 && item && item.duration && item.duration.valid())
             minutes = item.duration.toMinutes()
         if (minutes <= 0)
@@ -60,15 +113,15 @@ Item {
 
     readonly property string metaLine: {
         const parts = [info.isEpisode ? qsTr("Series") : qsTr("Movie")]
-        const year = (tmdb.data.year ?? 0) > 0 ? tmdb.data.year : info.year
+        const year = (root.meta.year ?? 0) > 0 ? root.meta.year : info.year
         if (year > 0)
             parts.push(String(year))
         if (runtimeText !== "")
             parts.push(runtimeText)
         if (info.resolution !== "")
             parts.push(info.resolution)
-        if ((tmdb.data.rating ?? 0) > 0)
-            parts.push("★ " + tmdb.data.rating.toFixed(1))
+        if ((root.meta.rating ?? 0) > 0)
+            parts.push("★ " + root.meta.rating.toFixed(1))
         return parts.join("  •  ")
     }
 
@@ -104,7 +157,7 @@ Item {
 
             Image {
                 anchors.fill: parent
-                source: tmdb.backdrop !== "" ? tmdb.backdrop : (root.item ? (root.item.thumbnail || "") : "")
+                source: root.backdropUrl !== "" ? root.backdropUrl : (root.item ? (root.item.thumbnail || "") : "")
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
             }
@@ -123,7 +176,7 @@ Item {
                 anchors.right: parent.right
                 anchors.rightMargin: VLCStyle.dp(36, VLCStyle.scale)
                 anchors.bottom: parent.bottom
-                text: tmdb.data.title || MainCtx.cleanTitle(root.rawTitle)
+                text: root.meta.title || MainCtx.cleanTitle(root.rawTitle)
                 color: "#FFFFFF"
                 font.pixelSize: VLCStyle.dp(38, VLCStyle.scale)
                 font.weight: Font.Bold
@@ -164,63 +217,93 @@ Item {
             anchors.rightMargin: VLCStyle.dp(36, VLCStyle.scale)
             spacing: VLCStyle.dp(14, VLCStyle.scale)
 
-            Row {
-                spacing: VLCStyle.dp(12, VLCStyle.scale)
+            // progress of a started file
+            Item {
+                visible: root.resumeSeconds > 0
+                width: parent.width
+                height: VLCStyle.dp(18, VLCStyle.scale)
 
                 Rectangle {
-                    width: playLabel.implicitWidth + 2 * VLCStyle.dp(26, VLCStyle.scale)
-                    height: VLCStyle.dp(40, VLCStyle.scale)
-                    radius: VLCStyle.dp(4, VLCStyle.scale)
-                    color: playHover.hovered ? "#BFBFBF" : "#FFFFFF"
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - timeLeft.implicitWidth - VLCStyle.dp(12, VLCStyle.scale)
+                    height: VLCStyle.dp(4, VLCStyle.scale)
+                    radius: height / 2
+                    color: "#4D4D4D"
 
-                    Text {
-                        id: playLabel
-
-                        anchors.centerIn: parent
-                        text: "▶  " + qsTr("Play")
-                        color: "#141414"
-                        font.pixelSize: VLCStyle.dp(17, VLCStyle.scale)
-                        font.weight: Font.Bold
-                    }
-
-                    HoverHandler { id: playHover; cursorShape: Qt.PointingHandCursor }
-                    TapHandler {
-                        onTapped: {
-                            if (root.item && root.item.id !== undefined) {
-                                MediaLib.addAndPlay(root.item.id)
-                                MainCtx.playerView = true
-                                root.close()
-                            }
-                        }
+                    Rectangle {
+                        width: parent.width * Math.min(1, root.progress)
+                        height: parent.height
+                        radius: parent.radius
+                        color: "#E50914"
                     }
                 }
 
+                Text {
+                    id: timeLeft
+
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: qsTr("%1 left").arg(root._clock(Math.max(0, root.totalSeconds - root.resumeSeconds)))
+                    color: "#B3B3B3"
+                    font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
+                }
+            }
+
+            Flow {
+                width: parent.width
+                spacing: VLCStyle.dp(12, VLCStyle.scale)
+
                 Repeater {
-                    model: tmdb.imdbId !== "" ? [
-                        { label: qsTr("IMDb"), url: MainCtx.imdbUrl(tmdb.imdbId) },
-                        { label: qsTr("Torrents"), url: MainCtx.topTenUrl(tmdb.imdbId) }
-                    ] : []
+                    model: {
+                        const list = []
+                        if (!root.isWeb) {
+                            if (root.resumeSeconds > 0) {
+                                list.push({ kind: "play", primary: true,
+                                            label: "▶  " + qsTr("Resume from %1").arg(root._clock(root.resumeSeconds)) })
+                                list.push({ kind: "restart", primary: false, label: qsTr("Play from beginning") })
+                            } else {
+                                list.push({ kind: "play", primary: true, label: "▶  " + qsTr("Play") })
+                            }
+                        }
+                        if (root.imdb !== "") {
+                            list.push({ kind: "imdb", primary: root.isWeb, label: qsTr("Open IMDb") })
+                            list.push({ kind: "torrents", primary: root.isWeb, label: qsTr("Open Heartive (torrents)") })
+                        }
+                        return list
+                    }
 
                     delegate: Rectangle {
+                        id: btn
+
                         required property var modelData
 
-                        width: linkLabel.implicitWidth + 2 * VLCStyle.dp(22, VLCStyle.scale)
+                        width: btnLabel.implicitWidth + 2 * VLCStyle.dp(24, VLCStyle.scale)
                         height: VLCStyle.dp(40, VLCStyle.scale)
                         radius: VLCStyle.dp(4, VLCStyle.scale)
-                        color: linkHover.hovered ? Qt.rgba(0.43, 0.43, 0.45, 0.55) : Qt.rgba(0.43, 0.43, 0.45, 0.7)
+                        color: modelData.primary ? (btnHover.hovered ? "#BFBFBF" : "#FFFFFF")
+                                                 : (btnHover.hovered ? Qt.rgba(0.43, 0.43, 0.45, 0.55) : Qt.rgba(0.43, 0.43, 0.45, 0.7))
 
                         Text {
-                            id: linkLabel
+                            id: btnLabel
 
                             anchors.centerIn: parent
-                            text: modelData.label
-                            color: "#FFFFFF"
+                            text: btn.modelData.label
+                            color: btn.modelData.primary ? "#141414" : "#FFFFFF"
                             font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
                             font.weight: Font.Bold
                         }
 
-                        HoverHandler { id: linkHover; cursorShape: Qt.PointingHandCursor }
-                        TapHandler { onTapped: MainCtx.openExternal(modelData.url) }
+                        HoverHandler { id: btnHover; cursorShape: Qt.PointingHandCursor }
+                        TapHandler {
+                            onTapped: {
+                                switch (btn.modelData.kind) {
+                                case "play": root.play(false); break
+                                case "restart": root.play(true); break
+                                case "imdb": MainCtx.openExternal(MainCtx.imdbUrl(root.imdb)); break
+                                case "torrents": MainCtx.openExternal(MainCtx.topTenUrl(root.imdb)); break
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -233,9 +316,9 @@ Item {
             }
 
             Text {
-                visible: (tmdb.data.tagline ?? "") !== ""
+                visible: (root.meta.tagline ?? "") !== ""
                 width: parent.width
-                text: tmdb.data.tagline ?? ""
+                text: root.meta.tagline ?? ""
                 color: "#B3B3B3"
                 font.pixelSize: VLCStyle.dp(15, VLCStyle.scale)
                 font.italic: true
@@ -245,8 +328,10 @@ Item {
             Text {
                 width: parent.width
                 text: {
-                    if (tmdb.overview !== "")
-                        return tmdb.overview
+                    if (root.overviewText !== "")
+                        return root.overviewText
+                    if (root.isWeb)
+                        return qsTr("No synopsis available.")
                     if (!MainCtx.metaEnabled())
                         return qsTr("Add a TMDB access token in Preferences to see the synopsis and artwork.")
                     return Object.keys(tmdb.data).length > 0 ? qsTr("No synopsis available.")
@@ -259,15 +344,16 @@ Item {
             }
 
             Text {
-                visible: tmdb.genres.length > 0
+                visible: root.genreList.length > 0
                 width: parent.width
-                text: qsTr("Genres: %1").arg(tmdb.genres.join(", "))
+                text: qsTr("Genres: %1").arg(root.genreList.join(", "))
                 color: "#B3B3B3"
                 font.pixelSize: VLCStyle.dp(14, VLCStyle.scale)
                 wrapMode: Text.WordWrap
             }
 
             Text {
+                visible: !root.isWeb
                 width: parent.width
                 text: qsTr("File: %1").arg(root.rawTitle)
                 color: "#808080"

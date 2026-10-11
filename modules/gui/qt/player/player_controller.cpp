@@ -1486,6 +1486,33 @@ void PlayerController::setSubtitleDelay(VLCDuration delay)
     emit subtitleDelayChanged(delay);
 }
 
+int PlayerController::getSubtitleTextScale() const
+{
+    Q_D(const PlayerController);
+    vlc_player_locker lock{ d->m_player };
+    return vlc_player_GetSubtitleTextScale( d->m_player );
+}
+
+void PlayerController::setSubtitleTextScale(int scale)
+{
+    Q_D(PlayerController);
+    scale = qBound( 10, scale, 500 );
+    {
+        vlc_player_locker lock{ d->m_player };
+        if( int(vlc_player_GetSubtitleTextScale( d->m_player )) == scale )
+            return;
+        vlc_player_SetSubtitleTextScale( d->m_player, scale );
+    }
+    emit subtitleTextScaleChanged( scale );
+}
+
+/*Q_INVOKABLE*/void PlayerController::saveSubtitleTextScale()
+{
+    Q_D(PlayerController);
+    config_PutInt( "sub-text-scale", getSubtitleTextScale() );
+    config_SaveConfigFile( d->p_intf );
+}
+
 void PlayerController::setSecondarySubtitleDelay(VLCDuration delay)
 {
     Q_D(PlayerController);

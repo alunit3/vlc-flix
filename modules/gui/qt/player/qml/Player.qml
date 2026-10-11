@@ -939,6 +939,14 @@ FocusScope {
         anchors.fill: parent
     }
 
+    // flix: "Resuming from 12:34 - Start over"
+    FlixResumeToast {
+        anchors.left: parent.left
+        anchors.leftMargin: VLCStyle.dp(48, VLCStyle.scale)
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: VLCStyle.dp(150, VLCStyle.scale)
+    }
+
     // flix: "Download subtitles?" from the online subtitle service
     FlixSubOffer {
         anchors.left: parent.left

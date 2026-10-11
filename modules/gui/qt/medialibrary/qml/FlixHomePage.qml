@@ -163,6 +163,7 @@ Widgets.PageExt {
                 }
 
                 onSeeAllClicked: root.seeAllButtonClicked("continueWatching", Qt.MouseFocusReason)
+                onInfoRequested: (item) => moreInfo.open(item)
                 onMoveUp: root._step(continueRow, -1)
                 onMoveDown: root._step(continueRow, 1)
             }
@@ -172,6 +173,15 @@ Widgets.PageExt {
 
                 width: parent.width
                 sideMargin: root.sideMargin
+
+                onInfoRequested: (item) => moreInfo.open(item)
+            }
+
+            FlixLibraryPrompt {
+                width: parent.width
+                sideMargin: root.sideMargin
+                empty: allRow.count === 0
+                onAddFolder: History.push(["mlsettings"])
             }
 
             FlixRow {
@@ -192,6 +202,7 @@ Widgets.PageExt {
                 }
 
                 onSeeAllClicked: root.seeAllButtonClicked("newVideo", Qt.MouseFocusReason)
+                onInfoRequested: (item) => moreInfo.open(item)
                 onMoveUp: root._step(recentRow, -1)
                 onMoveDown: root._step(recentRow, 1)
             }
@@ -214,6 +225,7 @@ Widgets.PageExt {
                 }
 
                 onSeeAllClicked: root.seeAllButtonClicked("favorites", Qt.MouseFocusReason)
+                onInfoRequested: (item) => moreInfo.open(item)
                 onMoveUp: root._step(favoritesRow, -1)
                 onMoveDown: root._step(favoritesRow, 1)
             }
@@ -235,6 +247,7 @@ Widgets.PageExt {
                 }
 
                 onSeeAllClicked: root.seeAllButtonClicked("newVideo", Qt.MouseFocusReason)
+                onInfoRequested: (item) => moreInfo.open(item)
                 onMoveUp: root._step(allRow, -1)
                 onMoveDown: root._step(allRow, 1)
             }

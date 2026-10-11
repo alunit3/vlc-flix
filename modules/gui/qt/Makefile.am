@@ -1093,8 +1093,10 @@ libqml_module_medialibrary_a_QML = \
 	medialibrary/qml/FlixHero.qml \
 	medialibrary/qml/FlixHomePage.qml \
 	medialibrary/qml/FlixMeta.qml \
+	medialibrary/qml/FlixLibraryPrompt.qml \
 	medialibrary/qml/FlixMoreInfo.qml \
 	medialibrary/qml/FlixRow.qml \
+	medialibrary/qml/FlixSearchDisplay.qml \
 	medialibrary/qml/FlixTopTen.qml \
 	medialibrary/qml/HomeDisplay.qml \
 	medialibrary/qml/HomePage.qml \
@@ -1187,6 +1189,7 @@ libqml_module_player_a_QML = \
 	player/qml/MiniPlayer.qml \
 	player/qml/PIPPlayer.qml \
 	player/qml/FlixPauseOverlay.qml \
+	player/qml/FlixResumeToast.qml \
 	player/qml/FlixSubOffer.qml \
 	player/qml/Player.qml \
 	player/qml/PlayerControlLayout.qml \

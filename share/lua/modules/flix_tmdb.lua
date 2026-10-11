@@ -57,8 +57,13 @@ function Service:path(...)
 end
 
 function Service:prepare()
-    for _, sub in ipairs({ "", "movie", "posters", "backdrops", "discover" }) do
+    for _, sub in ipairs({ "", "movie", "posters", "backdrops", "discover", "detail" }) do
         pcall(vlc.io.mkdir, sub == "" and self.dir or self:path(sub), "0700")
+    end
+    -- the Top 10 on disk is still good after a restart: do not fetch it again at every start
+    local top = self:read_json(self:path("top10.json"))
+    if type(top) == "table" and tonumber(top.fetched) and top.language == self.language then
+        self.top10_at = tonumber(top.fetched)
     end
 end
 
@@ -99,10 +104,21 @@ function Service:get(path, params)
         headers.Authorization = "Bearer " .. self.token -- v4 read access token
     end
     local url = self.base .. path .. "?" .. os_api.query(params)
+    if self.blocked_until and now() < self.blocked_until then return nil, "rate_limit" end
     local status, body = vlc.http.get(url, headers)
-    if not status then return nil, "network" end
+    if not status then
+        self.blocked_until = now() + 5                  -- offline: do not hammer, try again shortly
+        return nil, "network"
+    end
     if status == 401 then return nil, "unauthorized" end
-    if status == 429 then return nil, "rate_limit" end
+    if status == 429 then
+        self.blocked_until = now() + 10                 -- TMDB asked us to slow down
+        return nil, "rate_limit"
+    end
+    if status >= 500 then
+        self.blocked_until = now() + 5
+        return nil, "http_error"
+    end
     if status < 200 or status >= 300 then return nil, "http_error" end
     local decoded = type(body) == "string" and json.decode(body) or nil
     if type(decoded) ~= "table" then return nil, "invalid_response" end
@@ -233,6 +249,24 @@ function Service:lookup(req)
     return true
 end
 
+-- details of a title (with external ids) from detail/<kind><id>.json when it is younger than 14 days,
+-- else from TMDB (and saved)
+function Service:cached_detail(kind, id)
+    local path = self:path("detail", kind .. tostring(id) .. ".json")
+    local saved = self:read_json(path)
+    if type(saved) == "table" and saved.language == self.language
+        and now() - (tonumber(saved.fetched) or 0) < 14 * 86400 and type(saved.data) == "table" then
+        return saved.data
+    end
+    local d = self:get("/" .. kind .. "/" .. tostring(id),
+        { language = self.language, append_to_response = "external_ids" })
+    if d then
+        write_file(path, json.encode({ language = self.language, fetched = now(), data = d }))
+        return d
+    end
+    return type(saved) == "table" and saved.data or nil   -- offline: an old copy is better than none
+end
+
 -- the movies that are trending this week, with IMDb ids, into top10.json
 function Service:top10()
     local trending, err = self:get("/trending/movie/week", { language = self.language })
@@ -240,8 +274,7 @@ function Service:top10()
     local items = {}
     for _, row in ipairs(trending.results or {}) do
         if #items >= 10 then break end
-        local d = self:get("/movie/" .. tostring(row.id),
-            { language = self.language, append_to_response = "external_ids" })
+        local d = self:cached_detail("movie", row.id)
         if d then
             local r = self:record("movie", d)
             items[#items + 1] = {
@@ -426,6 +459,7 @@ end
 -- Returns the key that changed ("top10" or a lookup key), or nil.
 function Service:step()
     if self.token == "" then return nil end
+    if self.blocked_until and now() < self.blocked_until and #self.queue > 0 then return nil end
     local req = table.remove(self.queue, 1)
     if req then
         self.queued[req.key] = nil

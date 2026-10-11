@@ -140,7 +140,14 @@ Item {
         if (!selected)
             return
         stream = { state: "connecting" }
-        MainCtx.torrentStart(selected)
+        const source = Object.assign({}, selected)
+        // what the player needs for subtitles and "continue watching"
+        source.title = displayTitle
+        source.meta = { title: info.title, year: info.year ?? 0, imdb: info.imdbId ?? "",
+                        tmdbId: info.tmdbId ?? 0, poster: info.poster ?? "",
+                        mediaType: info.isTv ? "tv" : "movie",
+                        season: info.isTv ? season : 0, episode: info.isTv ? episode : 0 }
+        MainCtx.torrentStart(source)
     }
 
     function _speed(bps) {
@@ -176,7 +183,7 @@ Item {
             if (status.state === "ready") {
                 root.handedOver = true
                 MediaLib.addAndPlay(status.url, ["meta-title=" + root.displayTitle])
-                MainCtx.resumeFraction = 0
+                MainCtx.resumeFraction = MainCtx.torrentResume()
                 MainCtx.resumeNotice = 0
                 MainCtx.playerView = true
                 root.stream = null

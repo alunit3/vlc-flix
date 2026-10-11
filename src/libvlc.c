@@ -328,6 +328,8 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
      * in "flix-sub-offer" and the interface answers in "flix-sub-reply" */
     var_Create(p_libvlc, "flix-sub-offer", VLC_VAR_STRING);
     var_Create(p_libvlc, "flix-sub-reply", VLC_VAR_STRING);
+    /* what the torrent stream being played is (JSON), so subtitles can be found for it */
+    var_Create(p_libvlc, "flix-stream-info", VLC_VAR_STRING);
     /* TMDB metadata: the interface queues titles in "flix-meta-request" (JSON list),
      * the Lua service announces finished cache entries in "flix-meta-update" */
     var_Create(p_libvlc, "flix-meta-request", VLC_VAR_STRING);

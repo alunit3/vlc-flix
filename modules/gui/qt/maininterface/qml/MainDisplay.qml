@@ -105,6 +105,16 @@ FocusScope {
             MainCtx.sendHotkey(event.key, event.modifiers);
     }
 
+    // VLCFlix: storage / trackers page, created the first time it is asked for
+    Loader {
+        id: storageLoader
+
+        active: false
+        anchors.fill: parent
+        z: 1000
+        source: "qrc:///qt/qml/VLC/MediaLibrary/FlixStoragePage.qml"
+    }
+
     readonly property var pageModel: [
         {
             name: "home",
@@ -280,6 +290,11 @@ FocusScope {
         playqueueVisible: pannelVisiblity.showPlayqueue
 
         // flix: top tabs replace the side navigation pane
+        onStorageRequested: {
+            storageLoader.active = true
+            storageLoader.item.open()
+        }
+
         onNavigationRequested: (uri) => {
             if (stackView.isDefaulLoadedForPath([...uri]) ||
                 History.exactMatch(History.viewPath, uri)) {

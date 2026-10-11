@@ -20,7 +20,7 @@ function descriptor()
         title = "Find Subtitles Online...",
         shortdesc = "FlixSubs",          -- the interface finds the extension by this name
         version = VERSION,
-        author = "Flix",
+        author = "VLCFlix",
         capabilities = {},
     }
 end

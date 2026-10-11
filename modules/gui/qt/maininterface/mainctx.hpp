@@ -442,7 +442,26 @@ public:
     // web players of streaming providers (WebView2 helper window)
     Q_INVOKABLE bool webPlayerAvailable() const;
     Q_INVOKABLE QVariantList webProviders();
-    Q_INVOKABLE void openWebPlayer(const QUrl &url, const QString &title);
+    // info: {key, title, poster, tmdbId, mediaType, season, episode, imdb}; frame: show the provider in
+    // a frame so its playback progress can be saved ("continue watching")
+    Q_INVOKABLE void openWebPlayer(const QUrl &url, const QString &title, bool frame = false,
+                                   const QVariantMap &info = QVariantMap());
+    Q_INVOKABLE int webResumeSeconds(const QString &key) const;
+    // continue watching: {key, kind ("torrent"|"web"), title, poster, fraction, seconds, length, updated, ...}
+    Q_INVOKABLE QVariantList resumeList() const;
+    Q_INVOKABLE void removeResume(const QString &key);
+    // the torrent being streamed (its source map incl. meta + resumeKey), empty when none
+    Q_PROPERTY(QVariantMap torrentSession MEMBER m_torrentSession NOTIFY torrentSessionChanged FINAL)
+    // fraction (0.03..0.95) saved for the torrent just started, 0 when none
+    Q_INVOKABLE double torrentResume() const;
+    Q_INVOKABLE void saveTorrentResume(double fraction, int seconds, int length);
+    // user trackers (one URL per line); setUserTrackers returns {saved, invalid:[...]}
+    Q_INVOKABLE QString userTrackers() const;
+    Q_INVOKABLE QVariantMap setUserTrackers(const QString &text);
+    // storage used by VLCFlix: [{kind, label, bytes, files}] and clearing one kind
+    Q_INVOKABLE QVariantList storageInfo() const;
+    Q_INVOKABLE bool clearStorage(const QString &kind);
+    Q_INVOKABLE bool torrentRunning() const { return m_streamProc != nullptr; }
     Q_INVOKABLE void torrentSources(const QString &imdbId, int season, int episode);
     Q_INVOKABLE void torrentStart(const QVariantMap &source);
     Q_INVOKABLE void torrentCancel();
@@ -576,6 +595,12 @@ protected:
     QByteArray m_streamBuffer;
     QString m_torrentError;
     QVariantMap m_torrentStats;
+    QVariantMap m_torrentSession;
+    QByteArray m_webBuffer;
+    QString userFile(const QString &name) const;
+    QVariantMap readResume() const;
+    void writeResume(const QVariantMap &all) const;
+    QStringList trackerArgs() const;
     class QProcess *m_filesProc = nullptr;
     class QProcess *m_webProc = nullptr;
     QString torrentHelper() const;
@@ -701,6 +726,8 @@ signals:
     void torrentSourcesReady(const QVariantList &items, const QString &error);
     void torrentStatus(const QVariantMap &status);
     void torrentStatsChanged();
+    void torrentSessionChanged();
+    void resumeChanged();
     void torrentFilesReady(const QString &name, const QVariantList &files, const QString &error);
 
     void usingTouchChanged();

@@ -40,20 +40,56 @@ Item {
     readonly property bool isTv: item !== null && (item.mediaType ?? "movie") === "tv"
     readonly property var tmdbIdValue: item ? (item.tmdbId ?? meta.tmdbId ?? 0) : 0
 
-    function providerUrl(p) {
+    // "continue watching" of the web player: saved by the helper window under this key
+    readonly property string webKey: "web:" + tmdbIdValue + (isTv ? ":" + webSeason + ":" + webEpisode : "")
+    property int resumeTick: 0
+    readonly property var webEntry: {
+        resumeTick
+        for (const e of MainCtx.resumeList())
+            if (e.key === webKey)
+                return e
+        return null
+    }
+    readonly property int webResume: webEntry ? Math.max(0, (webEntry.seconds ?? 0) - 5) : 0
+
+    Connections {
+        target: MainCtx
+
+        function onResumeChanged() { root.resumeTick++ }
+    }
+
+    // template of the provider with the title (and a start time where the provider supports one)
+    function providerUrl(p, startSeconds) {
         const template = isTv ? p.tv : p.movie
         if (!template)
             return ""
-        return template.replace("{tmdb}", tmdbIdValue).replace("{imdb}", imdb)
-                       .replace("{season}", webSeason).replace("{episode}", webEpisode)
+        let url = template.replace("{tmdb}", tmdbIdValue).replace("{imdb}", imdb)
+                          .replace("{season}", webSeason).replace("{episode}", webEpisode)
+        if (startSeconds > 0 && p.start)
+            url += (url.indexOf("?") >= 0 ? "&" : "?") + p.start + "=" + startSeconds
+        return url
     }
 
-    function watchOnline(p) {
-        const url = providerUrl(p)
+    function watchOnline(p, fromStart) {
+        const start = fromStart ? 0 : webResume
+        const url = providerUrl(p, start)
         if (url === "")
             return
         MainCtx.setFlixPref("web/last", p.name)
-        MainCtx.openWebPlayer(url, root.meta.title || root.rawTitle)
+        MainCtx.openWebPlayer(url, root.meta.title || root.rawTitle, false, {
+            key: webKey, provider: p.name, title: root.meta.title || root.rawTitle,
+            poster: root.meta.poster || (item.poster ?? ""), tmdbId: tmdbIdValue,
+            mediaType: isTv ? "tv" : "movie", season: webSeason, episode: webEpisode, imdb: imdb })
+        root.providersOpen = false
+    }
+
+    // the provider that resumes this title, else the first one (VidStuck unless changed)
+    function mainProvider() {
+        if (webEntry && webEntry.provider)
+            for (const p of providers)
+                if (p.name === webEntry.provider)
+                    return p
+        return providers.length > 0 ? providers[0] : null
     }
 
     // true while the card is up; the item stays set until the exit animation is done
@@ -63,6 +99,8 @@ Item {
         closeTimer.stop()
         providersOpen = false
         providers = MainCtx.webProviders()
+        webSeason = entry.resumeSeason ?? 1
+        webEpisode = entry.resumeEpisode ?? 1
         item = entry
         shown = true
         forceActiveFocus()
@@ -346,8 +384,14 @@ Item {
                         if (root.imdb !== "") {
                             if (root.isWeb)
                                 list.push({ kind: "stream", primary: true, label: "▶  " + qsTr("Stream") })
-                            if (root.tmdbIdValue > 0)
-                                list.push({ kind: "web", primary: false, label: qsTr("Watch online") })
+                            if (root.tmdbIdValue > 0) {
+                                list.push({ kind: "web", primary: false,
+                                            label: root.webResume > 0 ? qsTr("Resume online from %1").arg(root._clock(root.webResume))
+                                                                      : qsTr("Watch online") })
+                                if (root.webResume > 0)
+                                    list.push({ kind: "webstart", primary: false, label: qsTr("Online from beginning") })
+                                list.push({ kind: "providers", primary: false, label: qsTr("Providers") + (root.providersOpen ? "  ▴" : "  ▾") })
+                            }
                             list.push({ kind: "imdb", primary: false, label: qsTr("Open IMDb") })
                             list.push({ kind: "torrents", primary: false, label: qsTr("Open Heartive (torrents)") })
                         }
@@ -389,10 +433,23 @@ Item {
                                 switch (btn.modelData.kind) {
                                 case "play": root.play(false); break
                                 case "restart": root.play(true); break
-                                case "web": root.providersOpen = !root.providersOpen; break
+                                case "web":
+                                    // a series needs its season / episode first: the provider box has the fields
+                                    if (root.isTv && root.webResume === 0)
+                                        root.providersOpen = !root.providersOpen
+                                    else if (root.mainProvider())
+                                        root.watchOnline(root.mainProvider(), false)
+                                    break
+                                case "webstart":
+                                    if (root.mainProvider())
+                                        root.watchOnline(root.mainProvider(), true)
+                                    break
+                                case "providers": root.providersOpen = !root.providersOpen; break
                                 case "stream":
                                     picker.open({ title: root.meta.title || root.rawTitle,
                                                   year: root.meta.year ?? 0,
+                                                  tmdbId: root.tmdbIdValue,
+                                                  poster: root.meta.poster || (root.item.poster ?? ""),
                                                   imdbId: root.imdb,
                                                   isTv: (root.item.mediaType ?? "movie") === "tv" })
                                     break
@@ -493,7 +550,7 @@ Item {
 
                                 required property var modelData
 
-                                readonly property bool last: MainCtx.flixPref("web/last", "") === modelData.name
+                                readonly property bool last: (root.providers.length > 0 && root.providers[0].name === modelData.name)
 
                                 width: chipLabel.implicitWidth + 2 * VLCStyle.dp(14, VLCStyle.scale)
                                 height: VLCStyle.dp(30, VLCStyle.scale)

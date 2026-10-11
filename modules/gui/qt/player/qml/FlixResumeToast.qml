@@ -76,6 +76,37 @@ Rectangle {
         function onLengthChanged() { root.trySeek() }
     }
 
+    // continue watching for torrent streams: the helper's address changes every time, so the
+    // position is saved under the torrent (MainCtx.torrentSession) instead of the file
+    readonly property bool isTorrentStream: {
+        const u = Player.url.toString()
+        return u.indexOf("http://127.0.0.1:") === 0 && MainCtx.torrentSession.resumeKey !== undefined
+    }
+
+    function saveTorrentPosition() {
+        if (!isTorrentStream)
+            return
+        const total = Player.length.toSeconds()
+        if (total > 60)
+            MainCtx.saveTorrentResume(Player.position, Math.round(Player.position * total), Math.round(total))
+    }
+
+    Timer {
+        interval: 5000
+        repeat: true
+        running: root.isTorrentStream && Player.playingState === Player.PLAYING_STATE_PLAYING
+        onTriggered: root.saveTorrentPosition()
+    }
+
+    Connections {
+        target: Player
+
+        function onPlayingStateChanged() {
+            if (Player.playingState === Player.PLAYING_STATE_PAUSED)
+                root.saveTorrentPosition()
+        }
+    }
+
     // starts counting down once the video really plays
     property bool armed: seconds > 0 && playing
 

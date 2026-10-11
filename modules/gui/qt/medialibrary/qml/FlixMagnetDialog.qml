@@ -59,6 +59,20 @@ Item {
         input.forceActiveFocus()
     }
 
+    // continue a torrent from "Continue Streaming": no questions, the same file as before
+    function resume(entry) {
+        open()
+        torrentFile = entry.torrentFile ?? ""
+        input.text = torrentFile !== "" ? torrentFile : (entry.magnet ?? "")
+        torrentName = entry.title ?? ""
+        stream = { state: "connecting" }
+        const source = torrentFile !== "" ? { torrentFile: torrentFile } : { magnet: entry.magnet }
+        source.fileIdx = entry.fileIdx ?? -1
+        source.title = entry.title ?? ""
+        source.meta = entry
+        MainCtx.torrentStart(source)
+    }
+
     function close() {
         if (!shown)
             return
@@ -97,6 +111,7 @@ Item {
         stream = { state: "connecting" }
         const source = torrentFile !== "" ? { torrentFile: torrentFile } : { magnet: input.text.trim() }
         source.fileIdx = selectedIdx
+        source.title = displayTitle
         MainCtx.torrentStart(source)
     }
 
@@ -149,7 +164,7 @@ Item {
             if (status.state === "ready") {
                 root.handedOver = true
                 MediaLib.addAndPlay(status.url, ["meta-title=" + root.displayTitle])
-                MainCtx.resumeFraction = 0
+                MainCtx.resumeFraction = MainCtx.torrentResume()
                 MainCtx.resumeNotice = 0
                 MainCtx.playerView = true
                 root.stream = null

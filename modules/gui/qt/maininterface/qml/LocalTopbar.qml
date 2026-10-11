@@ -54,6 +54,8 @@ T.ToolBar {
     property alias navigationButton: navigationVisibilty
 
     signal toggleNavigationVisibility()
+    // VLCFlix: open the storage / trackers page
+    signal storageRequested()
     signal togglePlayqueueVisibility()
 
     implicitHeight: Math.max(implicitBackgroundHeight + topInset + bottomInset,
@@ -161,10 +163,10 @@ T.ToolBar {
                     color: theme.accent
                 }
 
-                // flix: placeholder wordmark (rename before publishing)
+                // VLCFlix wordmark (placeholder look until the project gets its own logo)
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "FLIX"
+                    text: "VLCFLIX"
                     color: "#E50914"
                     font.pixelSize: VLCStyle.dp(24, VLCStyle.scale)
                     font.weight: Font.Black
@@ -212,6 +214,29 @@ T.ToolBar {
 
                 Navigation.parentItem: root
                 Navigation.leftItem: navigationButtons
+
+                // VLCFlix: storage, cache and trackers
+                Rectangle {
+                    id: storageBtn
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: VLCStyle.bannerButton_height
+                    height: width
+                    radius: width / 2
+                    color: storageHover.hovered ? Qt.rgba(1, 1, 1, 0.16) : "transparent"
+
+                    Behavior on color { ColorAnimation { duration: 140 } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "⚙"
+                        color: "#E5E5E5"
+                        font.pixelSize: VLCStyle.dp(20, VLCStyle.scale)
+                    }
+
+                    HoverHandler { id: storageHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { gesturePolicy: TapHandler.ReleaseWithinBounds; onTapped: root.storageRequested() }
+                }
 
                 Widgets.IconToolButton {
                     id: playlistBtn

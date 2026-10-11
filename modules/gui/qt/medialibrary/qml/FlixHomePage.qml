@@ -183,6 +183,19 @@ Widgets.PageExt {
                 onMoveDown: root._step(continueRow, 1)
             }
 
+            FlixStreamRow {
+                id: streamRow
+
+                width: parent.width
+                sideMargin: root.sideMargin
+
+                onResumeTorrent: (entry) => magnetDialog.resume(entry)
+                onResumeWeb: (entry) => moreInfo.open({
+                    title: entry.title, poster: entry.poster, backdrop: entry.poster, year: 0,
+                    tmdbId: entry.tmdbId, mediaType: entry.mediaType ?? "movie", imdbId: entry.imdb ?? "",
+                    resumeSeason: entry.season ?? 1, resumeEpisode: entry.episode ?? 1 })
+            }
+
             FlixTopTen {
                 id: topTen
 

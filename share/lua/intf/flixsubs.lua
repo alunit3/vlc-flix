@@ -108,7 +108,25 @@ local function find_best(client, uri, info, langs)
     }
 
     local rows
-    local hash = api.hash(uri)
+    -- a torrent stream (local http address): no file to hash, the IMDb id is the best key
+    if info.imdb and info.imdb:match("^tt%d+$") then
+        local params = copy(base)
+        local digits = info.imdb:match("%d+")
+        if info.season and info.season > 0 and info.episode and info.episode > 0 then
+            params.parent_imdb_id = digits
+            params.season_number = info.season
+            params.episode_number = info.episode
+        else
+            params.imdb_id = digits
+        end
+        local found, err = client:search(params)
+        if not found and err ~= "invalid_response" and err ~= "http_error" then
+            return nil, err
+        end
+        rows = found
+    end
+
+    local hash = (not rows or #rows == 0) and not uri:match("^http://127%.0%.0%.1:") and api.hash(uri) or nil
     if hash then
         local params = copy(base)
         params.moviehash = hash
@@ -155,8 +173,10 @@ local function download_and_enable(client, offer)
         return
     end
 
+    pcall(vlc.io.mkdir, vlc.config.userdatadir() .. "/subtitles", "0700")
     local stem = basename(offer.path):gsub("%.%w+$", "")
-    local dirs = { dirname(offer.path), vlc.config.userdatadir() .. "/subtitles" }
+    local dirs = { vlc.config.userdatadir() .. "/subtitles" }
+    if not offer.stream then table.insert(dirs, 1, dirname(offer.path)) end
     local saved, save_err = api.save(body, dirs, stem, offer.row.language, offer.row.id)
     if not saved then
         notify(explain(save_err))
@@ -187,7 +207,8 @@ local function consider(uri)
         log("no API key set, not looking for subtitles")
         return
     end
-    if not uri:match("^file://") then return end
+    local stream = uri:match("^http://127%.0%.0%.1:%d+/") ~= nil
+    if not stream and not uri:match("^file://") then return end
 
     -- only videos that have no subtitles at all (embedded or next to the file)
     if #(vlc.player.get_video_tracks() or {}) == 0 then return end
@@ -196,9 +217,23 @@ local function consider(uri)
         return
     end
 
-    local path = vlc.strings.make_path(uri)
-    if not path then return end
-    local info = api.release_info(basename(path))
+    local path, info
+    if stream then
+        -- the interface publishes what it is streaming; without it we cannot name the movie
+        local text = vlc.var.get(libvlc, "flix-stream-info")
+        local data = text and text ~= "" and json.decode(text) or nil
+        if type(data) ~= "table" or (data.title or "") == "" then return end
+        info = { title = data.title, year = tonumber(data.year) or 0,
+                 season = tonumber(data.season) or 0, episode = tonumber(data.episode) or 0,
+                 imdb = data.imdb }
+        local safe = (data.title:gsub("[^%w%-_ ]", ""):gsub("%s+", "."))
+        if info.year > 0 then safe = safe .. "." .. info.year end
+        path = vlc.config.userdatadir() .. "/subtitles/" .. safe .. ".mkv"
+    else
+        path = vlc.strings.make_path(uri)
+        if not path then return end
+        info = api.release_info(basename(path))
+    end
     local client = new_client()
     local row, err = find_best(client, uri, info, languages())
 
@@ -207,7 +242,7 @@ local function consider(uri)
         return
     end
 
-    local offer = { row = row, uri = uri, path = path, info = info,
+    local offer = { row = row, uri = uri, path = path, info = info, stream = stream,
                     display = display_name(info), expires = vlc.misc.mdate() + 90 * 1000000 }
 
     if flag("flixsubs-ask", true) then
@@ -232,6 +267,7 @@ end
 
 -- TMDB artwork / synopsis service: the interface queues titles in "flix-meta-request"
 local meta = nil
+local meta_busy = false
 local function meta_step()
     local token = str("flix-tmdb-token")
     if token == "" then return end
@@ -246,12 +282,22 @@ local function meta_step()
         vlc.var.set(libvlc, "flix-meta-request", "")
         meta:enqueue(request)
     end
-    local key, err = meta:step()
-    if key then
-        vlc.var.set(libvlc, "flix-meta-update", key)
-    elseif err then
-        log("metadata: " .. tostring(err))
-    end
+    -- several jobs per tick (the queue used to move one title every half second)
+    local started = vlc.misc.mdate()
+    local busy = false
+    repeat
+        local key, err = meta:step()
+        if key then
+            vlc.var.set(libvlc, "flix-meta-update", key)
+            busy = true
+        elseif err then
+            log("metadata: " .. tostring(err))
+            break
+        else
+            break
+        end
+    until vlc.misc.mdate() - started > 400000
+    meta_busy = busy
 end
 
 local function step()
@@ -293,5 +339,6 @@ while true do
     if not ok then
         vlc.msg.warn("[flixsubs] " .. tostring(err))
     end
-    vlc.misc.mwait(vlc.misc.mdate() + 500000)
+    -- poll fast while the metadata queue is being worked through, slowly otherwise
+    vlc.misc.mwait(vlc.misc.mdate() + (meta_busy and 50000 or 500000))
 end

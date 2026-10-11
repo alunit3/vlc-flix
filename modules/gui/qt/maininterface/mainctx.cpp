@@ -82,6 +82,8 @@
 #include <QFileInfo>
 #include <QFile>
 #include <QDir>
+#include <QDirIterator>
+#include <QSet>
 #include <QJsonDocument>
 #include <QCryptographicHash>
 #include <QJsonArray>
@@ -862,21 +864,22 @@ void MainCtx::torrentFiles(const QVariantMap &source)
                        torrentFile.isEmpty() ? magnet : torrentFile,
                        QStringLiteral("--data-dir"),
                        torrentDir() + QStringLiteral("/files-") + QString::number( QDateTime::currentSecsSinceEpoch() ) };
+    args << trackerArgs();
     proc->start( torrentHelper(), args );
 }
 
 // --- web player -----------------------------------------------------------------------
 
 static const char *const defaultProviders = R"JSON([
-  {"name": "VidLink",     "host": "vidlink.pro",       "movie": "https://vidlink.pro/movie/{tmdb}",       "tv": "https://vidlink.pro/tv/{tmdb}/{season}/{episode}"},
+  {"name": "VidStuck",    "host": "vidstuck.xyz",      "movie": "https://vidstuck.xyz/embed/movie/{tmdb}", "tv": "https://vidstuck.xyz/embed/tv/{tmdb}/{season}/{episode}", "start": "progress"},
+  {"name": "VidLink",     "host": "vidlink.pro",       "movie": "https://vidlink.pro/movie/{tmdb}",       "tv": "https://vidlink.pro/tv/{tmdb}/{season}/{episode}", "start": "startAt"},
   {"name": "VixSrc",      "host": "vixsrc.to",         "movie": "https://vixsrc.to/movie/{tmdb}",         "tv": "https://vixsrc.to/tv/{tmdb}/{season}/{episode}"},
-  {"name": "VidFast",     "host": "vidfast.vc",        "movie": "https://vidfast.vc/movie/{tmdb}",        "tv": "https://vidfast.vc/tv/{tmdb}/{season}/{episode}"},
+  {"name": "VidFast",     "host": "vidfast.vc",        "movie": "https://vidfast.vc/movie/{tmdb}",        "tv": "https://vidfast.vc/tv/{tmdb}/{season}/{episode}", "start": "startAt"},
   {"name": "VidZee",      "host": "vidzee.wtf",        "movie": "https://vidzee.wtf/movie/{tmdb}",        "tv": "https://vidzee.wtf/tv/{tmdb}/{season}/{episode}"},
   {"name": "VidNest",     "host": "vidnest.fun",       "movie": "https://vidnest.fun/movie/{tmdb}",       "tv": "https://vidnest.fun/tv/{tmdb}/{season}/{episode}"},
   {"name": "CineSrc",     "host": "cinesrc.st",        "movie": "https://cinesrc.st/embed/movie/{tmdb}",  "tv": "https://cinesrc.st/embed/tv/{tmdb}?s={season}&e={episode}"},
   {"name": "Atlantic",    "host": "atlantic.st",       "movie": "https://atlantic.st/movie/{tmdb}",       "tv": "https://atlantic.st/tv/{tmdb}/{season}/{episode}"},
   {"name": "VidRift",     "host": "vidrift.net",       "movie": "https://vidrift.net/?tmdb={tmdb}",        "tv": "https://vidrift.net/?tmdb={tmdb}&s={season}&e={episode}"},
-  {"name": "VidStuck",    "host": "vidstuck.xyz",      "movie": "https://vidstuck.xyz/embed/movie/{tmdb}", "tv": "https://vidstuck.xyz/embed/tv/{tmdb}/{season}/{episode}"},
   {"name": "Vidy",        "host": "www.vidy.st",       "movie": "https://www.vidy.st/movie/{tmdb}",       "tv": "https://www.vidy.st/tv/{tmdb}/{season}/{episode}"},
   {"name": "SuperEmbed",  "host": "superembed.stream", "movie": "https://superembed.stream/?tmdb={tmdb}",  "tv": "https://superembed.stream/?tmdb={tmdb}&s={season}&e={episode}"},
   {"name": "PrimeWire",   "host": "primewire.mov",     "movie": "https://primewire.mov/movie/{tmdb}",     "tv": "https://primewire.mov/tv/{tmdb}/{season}/{episode}"}
@@ -910,6 +913,14 @@ QVariantList MainCtx::webProviders()
         QVariantMap m = o.toVariantMap();
         result.append( m );
     }
+    // the preferred provider (VidStuck unless changed) goes first, whatever order the file has
+    const QString preferred = flixPref( QStringLiteral("web/default"), QStringLiteral("VidStuck") ).toString();
+    for( int i = 1; i < result.size(); ++i )
+        if( result.at( i ).toMap().value( QStringLiteral("name") ).toString() == preferred )
+        {
+            result.move( i, 0 );
+            break;
+        }
     return result;
 }
 
@@ -922,7 +933,7 @@ bool MainCtx::webPlayerAvailable() const
 #endif
 }
 
-void MainCtx::openWebPlayer(const QUrl &url, const QString &title)
+void MainCtx::openWebPlayer(const QUrl &url, const QString &title, bool frame, const QVariantMap &info)
 {
     if( url.scheme() != QLatin1String("https") || url.host().isEmpty() )
         return;
@@ -938,8 +949,37 @@ void MainCtx::openWebPlayer(const QUrl &url, const QString &title)
         m_webProc->kill();
         m_webProc->deleteLater();
     }
+    m_webBuffer.clear();
     m_webProc = new QProcess( this );
     QProcess *proc = m_webProc;
+    const QString key = info.value( QStringLiteral("key") ).toString();
+    connect( proc, &QProcess::readyReadStandardOutput, this, [this, proc, info, key]() {
+        m_webBuffer += proc->readAllStandardOutput();
+        int nl;
+        while( ( nl = m_webBuffer.indexOf( '\n' ) ) >= 0 )
+        {
+            const QJsonObject o = QJsonDocument::fromJson( m_webBuffer.left( nl ) ).object();
+            m_webBuffer.remove( 0, nl + 1 );
+            if( key.isEmpty() || o.value( QStringLiteral("event") ).toString() != QLatin1String("progress") )
+                continue;
+            const double seconds = o.value( QStringLiteral("seconds") ).toDouble();
+            const double length = o.value( QStringLiteral("duration") ).toDouble();
+            QVariantMap all = readResume();
+            QVariantMap entry = info;
+            entry.insert( QStringLiteral("kind"), QStringLiteral("web") );
+            entry.insert( QStringLiteral("seconds"), int( seconds ) );
+            entry.insert( QStringLiteral("length"), int( length ) );
+            entry.insert( QStringLiteral("fraction"), length > 0 ? seconds / length : 0.0 );
+            entry.insert( QStringLiteral("updated"), QDateTime::currentSecsSinceEpoch() );
+            // finished (>95 %) or barely started (<30 s): not worth continuing
+            if( length > 0 && seconds / length > 0.95 )
+                all.remove( key );
+            else if( seconds >= 30 )
+                all.insert( key, entry );
+            writeResume( all );
+            emit resumeChanged();
+        }
+    } );
     connect( proc, &QProcess::finished, this, [this, proc]( int code, QProcess::ExitStatus ) {
         const QByteArray err = proc->readAllStandardError().trimmed();
         msg_Dbg( p_intf, "flixweb ended: code %d %s", code, err.constData() );
@@ -951,11 +991,261 @@ void MainCtx::openWebPlayer(const QUrl &url, const QString &title)
         proc->deleteLater();
     } );
     proc->setProperty( "flixUrl", url );
-    proc->start( QCoreApplication::applicationDirPath() + QStringLiteral("/flix/flixweb.exe"),
-                 { QStringLiteral("--url"), url.toString( QUrl::FullyEncoded ),
-                   QStringLiteral("--title"), title,
-                   QStringLiteral("--data-dir"), torrentDir() + QStringLiteral("/../flix-web"),
-                   QStringLiteral("--parent-pid"), QString::number( QCoreApplication::applicationPid() ) } );
+    QStringList args { QStringLiteral("--url"), url.toString( QUrl::FullyEncoded ),
+                       QStringLiteral("--title"), title,
+                       QStringLiteral("--data-dir"), torrentDir() + QStringLiteral("/../flix-web"),
+                       QStringLiteral("--parent-pid"), QString::number( QCoreApplication::applicationPid() ) };
+    if( frame && !key.isEmpty() )
+        args << QStringLiteral("--frame");
+    proc->start( QCoreApplication::applicationDirPath() + QStringLiteral("/flix/flixweb.exe"), args );
+}
+
+// --- continue watching store (<userdata>/flix-resume.json) -----------------------------------
+
+QString MainCtx::userFile(const QString &name) const
+{
+    char *dir = config_GetUserDir( VLC_USERDATA_DIR );
+    if( dir == nullptr )
+        return QString();
+    const QString path = QDir::fromNativeSeparators( qfu( dir ) ) + QLatin1Char('/') + name;
+    free( dir );
+    return path;
+}
+
+QVariantMap MainCtx::readResume() const
+{
+    QFile f( userFile( QStringLiteral("flix-resume.json") ) );
+    if( !f.open( QIODevice::ReadOnly ) )
+        return {};
+    return QJsonDocument::fromJson( f.readAll() ).object().toVariantMap();
+}
+
+void MainCtx::writeResume(const QVariantMap &all) const
+{
+    // temp file + rename: a crash cannot leave a half written store
+    const QString path = userFile( QStringLiteral("flix-resume.json") );
+    QFile f( path + QStringLiteral(".tmp") );
+    if( !f.open( QIODevice::WriteOnly | QIODevice::Truncate ) )
+        return;
+    f.write( QJsonDocument( QJsonObject::fromVariantMap( all ) ).toJson( QJsonDocument::Compact ) );
+    f.close();
+    QFile::remove( path );
+    f.rename( path );
+}
+
+int MainCtx::webResumeSeconds(const QString &key) const
+{
+    return readResume().value( key ).toMap().value( QStringLiteral("seconds") ).toInt();
+}
+
+QVariantList MainCtx::resumeList() const
+{
+    const QVariantMap all = readResume();
+    QVariantList list;
+    for( auto it = all.begin(); it != all.end(); ++it )
+    {
+        QVariantMap e = it.value().toMap();
+        e.insert( QStringLiteral("key"), it.key() );
+        list.append( e );
+    }
+    std::sort( list.begin(), list.end(), []( const QVariant &a, const QVariant &b ) {
+        return a.toMap().value( QStringLiteral("updated") ).toLongLong()
+             > b.toMap().value( QStringLiteral("updated") ).toLongLong();
+    } );
+    return list;
+}
+
+void MainCtx::removeResume(const QString &key)
+{
+    QVariantMap all = readResume();
+    if( all.remove( key ) )
+    {
+        writeResume( all );
+        emit resumeChanged();
+    }
+}
+
+double MainCtx::torrentResume() const
+{
+    const QString key = m_torrentSession.value( QStringLiteral("resumeKey") ).toString();
+    if( key.isEmpty() || m_torrentSession.value( QStringLiteral("fromStart") ).toBool() )
+        return 0.0;
+    const double f = readResume().value( key ).toMap().value( QStringLiteral("fraction") ).toDouble();
+    return ( f > 0.03 && f < 0.95 ) ? f : 0.0;
+}
+
+void MainCtx::saveTorrentResume(double fraction, int seconds, int length)
+{
+    const QString key = m_torrentSession.value( QStringLiteral("resumeKey") ).toString();
+    if( key.isEmpty() || length <= 0 )
+        return;
+    QVariantMap all = readResume();
+    if( fraction > 0.95 )
+        all.remove( key );
+    else if( fraction > 0.03 )
+    {
+        QVariantMap e = m_torrentSession.value( QStringLiteral("meta") ).toMap();
+        e.insert( QStringLiteral("kind"), QStringLiteral("torrent") );
+        e.insert( QStringLiteral("title"), m_torrentSession.value( QStringLiteral("title") ) );
+        e.insert( QStringLiteral("magnet"), m_torrentSession.value( QStringLiteral("magnet") ) );
+        e.insert( QStringLiteral("torrentFile"), m_torrentSession.value( QStringLiteral("torrentFile") ) );
+        e.insert( QStringLiteral("fileIdx"), m_torrentSession.value( QStringLiteral("fileIdx"), -1 ) );
+        e.insert( QStringLiteral("fraction"), fraction );
+        e.insert( QStringLiteral("seconds"), seconds );
+        e.insert( QStringLiteral("length"), length );
+        e.insert( QStringLiteral("updated"), QDateTime::currentSecsSinceEpoch() );
+        all.insert( key, e );
+    }
+    else
+        return;
+    writeResume( all );
+    emit resumeChanged();
+}
+
+// --- trackers -------------------------------------------------------------------------------
+
+QString MainCtx::userTrackers() const
+{
+    QFile f( userFile( QStringLiteral("flix-trackers.txt") ) );
+    return f.open( QIODevice::ReadOnly ) ? QString::fromUtf8( f.readAll() ) : QString();
+}
+
+QVariantMap MainCtx::setUserTrackers(const QString &text)
+{
+    static const QRegularExpression trackerRe( QStringLiteral("^(udp|http|https|wss?)://[^\\s/]+(:\\d{1,5})?(/\\S*)?$"),
+                                               QRegularExpression::CaseInsensitiveOption );
+    QStringList good, bad;
+    for( const QString &raw : text.split( QLatin1Char('\n') ) )
+    {
+        const QString line = raw.trimmed();
+        if( line.isEmpty() )
+            continue;
+        if( line.startsWith( QLatin1Char('#') ) || trackerRe.match( line ).hasMatch() )
+            good << line;
+        else
+            bad << line;
+    }
+    bool saved = false;
+    QFile f( userFile( QStringLiteral("flix-trackers.txt") ) );
+    if( bad.isEmpty() && f.open( QIODevice::WriteOnly | QIODevice::Truncate ) )
+    {
+        f.write( good.join( QLatin1Char('\n') ).toUtf8() + "\n" );
+        saved = true;
+    }
+    QVariantMap r;
+    r.insert( QStringLiteral("saved"), saved );
+    r.insert( QStringLiteral("invalid"), bad );
+    return r;
+}
+
+QStringList MainCtx::trackerArgs() const
+{
+    const QString path = userFile( QStringLiteral("flix-trackers.txt") );
+    return QFileInfo::exists( path ) ? QStringList { QStringLiteral("--trackers-file"), path } : QStringList();
+}
+
+// --- storage --------------------------------------------------------------------------------
+
+namespace {
+struct StorageKind { const char *kind; const char *label; };
+const StorageKind storageKinds[] = {
+    { "torrentData",  QT_TRANSLATE_NOOP("MainCtx", "Torrent downloads (partial videos)") },
+    { "torrentCache", QT_TRANSLATE_NOOP("MainCtx", "Torrent source lists") },
+    { "meta",         QT_TRANSLATE_NOOP("MainCtx", "Posters and movie information (TMDB)") },
+    { "subtitles",    QT_TRANSLATE_NOOP("MainCtx", "Downloaded subtitles") },
+    { "web",          QT_TRANSLATE_NOOP("MainCtx", "Web player cookies and cache") },
+    { "resume",       QT_TRANSLATE_NOOP("MainCtx", "Continue watching history") },
+};
+
+void dirSize( const QString &path, qint64 &bytes, int &files )
+{
+    QDirIterator it( path, QDir::Files | QDir::Hidden, QDirIterator::Subdirectories );
+    while( it.hasNext() )
+    {
+        it.next();
+        bytes += it.fileInfo().size();
+        ++files;
+    }
+}
+}
+
+QVariantList MainCtx::storageInfo() const
+{
+    QVariantList list;
+    const QStringList dataFilters { QStringLiteral("data-*"), QStringLiteral("files-*") };
+    for( const StorageKind &k : storageKinds )
+    {
+        qint64 bytes = 0;
+        int files = 0;
+        const QString kind = QString::fromLatin1( k.kind );
+        if( kind == QLatin1String("torrentData") )
+        {
+            const QDir base( torrentDir() );
+            for( const QString &d : base.entryList( dataFilters, QDir::Dirs | QDir::NoDotAndDotDot ) )
+                dirSize( base.filePath( d ), bytes, files );
+        }
+        else if( kind == QLatin1String("torrentCache") )
+            dirSize( torrentDir() + QStringLiteral("/cache"), bytes, files );
+        else if( kind == QLatin1String("meta") )
+            dirSize( userFile( QStringLiteral("flix-meta") ), bytes, files );
+        else if( kind == QLatin1String("subtitles") )
+            dirSize( userFile( QStringLiteral("subtitles") ), bytes, files );
+        else if( kind == QLatin1String("web") )
+            dirSize( userFile( QStringLiteral("flix-web") ), bytes, files );
+        else
+        {
+            const QFileInfo fi( userFile( QStringLiteral("flix-resume.json") ) );
+            if( fi.exists() )
+            {
+                bytes = fi.size();
+                files = 1;
+            }
+        }
+        QVariantMap m;
+        m.insert( QStringLiteral("kind"), kind );
+        m.insert( QStringLiteral("label"), QCoreApplication::translate( "MainCtx", k.label ) );
+        m.insert( QStringLiteral("bytes"), bytes );
+        m.insert( QStringLiteral("files"), files );
+        list.append( m );
+    }
+    return list;
+}
+
+bool MainCtx::clearStorage(const QString &kind)
+{
+    // fixed folders under the user data folder only: nothing here comes from a path given by QML
+    if( kind == QLatin1String("torrentData") )
+    {
+        if( m_streamProc )
+            return false;                       // a stream is using the files
+        const QDir base( torrentDir() );
+        for( const QString &d : base.entryList( { QStringLiteral("data-*"), QStringLiteral("files-*") }, QDir::Dirs | QDir::NoDotAndDotDot ) )
+            QDir( base.filePath( d ) ).removeRecursively();
+        return true;
+    }
+    if( kind == QLatin1String("torrentCache") )
+        return QDir( torrentDir() + QStringLiteral("/cache") ).removeRecursively();
+    if( kind == QLatin1String("meta") )
+    {
+        const bool ok = QDir( userFile( QStringLiteral("flix-meta") ) ).removeRecursively();
+        emit metaUpdated( QStringLiteral("top10") );
+        return ok;
+    }
+    if( kind == QLatin1String("subtitles") )
+        return QDir( userFile( QStringLiteral("subtitles") ) ).removeRecursively();
+    if( kind == QLatin1String("web") )
+    {
+        if( m_webProc )
+            return false;
+        return QDir( userFile( QStringLiteral("flix-web") ) ).removeRecursively();
+    }
+    if( kind == QLatin1String("resume") )
+    {
+        QFile::remove( userFile( QStringLiteral("flix-resume.json") ) );
+        emit resumeChanged();
+        return true;
+    }
+    return false;
 }
 
 bool MainCtx::torrentAvailable() const
@@ -1012,6 +1302,7 @@ void MainCtx::torrentSources(const QString &imdbId, int season, int episode)
         proc->deleteLater();
         emit torrentSourcesReady( {}, tr("Could not start the torrent helper.") );
     } );
+    args << trackerArgs();
     proc->start( torrentHelper(), args );
 }
 
@@ -1025,6 +1316,7 @@ void MainCtx::stopTorrent()
         m_torrentStats.clear();
         emit torrentStatsChanged();
     }
+    var_SetString( vlc_object_instance(p_intf), "flix-stream-info", "" );
     QProcess *proc = m_streamProc;
     m_streamProc = nullptr;
     proc->disconnect( this );
@@ -1066,6 +1358,20 @@ void MainCtx::torrentStart(const QVariantMap &source)
     stopTorrent();
     m_streamBuffer.clear();
 
+    // what the player needs to know about this stream: resume key, subtitle search info
+    m_torrentSession = source;
+    {
+        const QRegularExpressionMatch hm = magnetRe.match( magnet );
+        const QString id = torrentFile.isEmpty() ? hm.captured( 1 ).toLower()
+                         : QFileInfo( torrentFile ).fileName() + QString::number( QFileInfo( torrentFile ).size() );
+        m_torrentSession.insert( QStringLiteral("resumeKey"),
+            QStringLiteral("t:%1:%2").arg( id ).arg( source.value( QStringLiteral("fileIdx"), -1 ).toInt() ) );
+        if( !m_torrentSession.contains( QStringLiteral("title") ) )
+            m_torrentSession.insert( QStringLiteral("title"),
+                source.value( QStringLiteral("meta") ).toMap().value( QStringLiteral("title") ) );
+        emit torrentSessionChanged();
+    }
+
     const int fileIdx = source.value( QStringLiteral("fileIdx"), -1 ).toInt();
     const QString dataDir = torrentDir() + QStringLiteral("/data-")
                           + QString::number( QDateTime::currentSecsSinceEpoch() );
@@ -1098,6 +1404,28 @@ void MainCtx::torrentStart(const QVariantMap &source)
                 const QUrl url( st.value( QStringLiteral("url") ).toString() );
                 if( url.scheme() != QLatin1String("http") || url.host() != QLatin1String("127.0.0.1") )
                     continue;
+                // tell the subtitle service what this stream is (the URL has no name)
+                const QString name = st.value( QStringLiteral("name") ).toString();
+                QVariantMap meta = m_torrentSession.value( QStringLiteral("meta") ).toMap();
+                const QVariantMap rel = releaseInfo( name.section( QLatin1Char('/'), -1 ) );
+                QJsonObject info;
+                info.insert( QStringLiteral("title"), meta.value( QStringLiteral("title") ).toString().isEmpty()
+                             ? rel.value( QStringLiteral("title") ).toString() : meta.value( QStringLiteral("title") ).toString() );
+                info.insert( QStringLiteral("year"), meta.value( QStringLiteral("year") ).toInt() ? meta.value( QStringLiteral("year") ).toInt()
+                             : rel.value( QStringLiteral("year") ).toInt() );
+                info.insert( QStringLiteral("season"), meta.value( QStringLiteral("season") ).toInt() ? meta.value( QStringLiteral("season") ).toInt()
+                             : rel.value( QStringLiteral("season") ).toInt() );
+                info.insert( QStringLiteral("episode"), meta.value( QStringLiteral("episode") ).toInt() ? meta.value( QStringLiteral("episode") ).toInt()
+                             : rel.value( QStringLiteral("episode") ).toInt() );
+                info.insert( QStringLiteral("imdb"), meta.value( QStringLiteral("imdb") ).toString() );
+                info.insert( QStringLiteral("name"), name );
+                var_SetString( vlc_object_instance(p_intf), "flix-stream-info",
+                               QJsonDocument( info ).toJson( QJsonDocument::Compact ).constData() );
+                if( m_torrentSession.value( QStringLiteral("title") ).toString().isEmpty() )
+                {
+                    m_torrentSession.insert( QStringLiteral("title"), info.value( QStringLiteral("title") ).toString() );
+                    emit torrentSessionChanged();
+                }
             }
             emit torrentStatus( st );
         }
@@ -1140,6 +1468,7 @@ void MainCtx::torrentStart(const QVariantMap &source)
                        QStringLiteral("--parent-pid"), QString::number( QCoreApplication::applicationPid() ) };
     if( fileIdx >= 0 )
         args << QStringLiteral("--file-idx") << QString::number( fileIdx );
+    args << trackerArgs();
     proc->start( torrentHelper(), args );
 }
 
@@ -1195,10 +1524,28 @@ QVariantMap MainCtx::meta(const QString &name)
         const QJsonObject o = QJsonDocument::fromJson( file.readAll() ).object();
         file.close();
         const qint64 age = QDateTime::currentSecsSinceEpoch() - qint64( o.value( QStringLiteral("fetched") ).toDouble() );
-        const bool stale = o.value( QStringLiteral("found") ).toBool() ? age > 30 * 86400
-                                                                          : age > 7 * 86400;
-        if( !o.isEmpty() && !stale )
-            return metaRecordToMap( o, directory );
+        const bool stale = o.value( QStringLiteral("found") ).toBool() ? age > 14 * 86400
+                                                                          : age > 1 * 86400;
+        if( !o.isEmpty() )
+        {
+            // stale-while-revalidate: show what we have at once, refresh it in the background
+            if( !stale )
+                return metaRecordToMap( o, directory );
+            static QSet<QString> refreshedThisSession;      // one refresh try per title and session
+            if( !m_metaPending.contains( key ) && o.value( QStringLiteral("found") ).toBool()
+                && !refreshedThisSession.contains( key ) )
+            {
+                refreshedThisSession.insert( key );
+                QVariantMap refresh;
+                refresh.insert( QStringLiteral("key"), key );
+                refresh.insert( QStringLiteral("title"), title );
+                refresh.insert( QStringLiteral("year"), year );
+                refresh.insert( QStringLiteral("season"), info.value( QStringLiteral("season") ) );
+                refresh.insert( QStringLiteral("episode"), info.value( QStringLiteral("episode") ) );
+                queueMeta( key, refresh );
+                return metaRecordToMap( o, directory );
+            }
+        }
     }
 
     // not cached: ask the service (batched)

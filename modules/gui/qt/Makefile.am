@@ -1092,6 +1092,8 @@ libqml_module_medialibrary_a_QML = \
 	medialibrary/qml/FlixCard.qml \
 	medialibrary/qml/FlixHero.qml \
 	medialibrary/qml/FlixHomePage.qml \
+	medialibrary/qml/FlixStreamRow.qml \
+	medialibrary/qml/FlixStoragePage.qml \
 	medialibrary/qml/FlixMagnetDialog.qml \
 	medialibrary/qml/FlixMeta.qml \
 	medialibrary/qml/FlixLibraryPrompt.qml \

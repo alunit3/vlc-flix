@@ -275,7 +275,10 @@ local function meta_step()
     if not meta or meta.token ~= token or meta.language ~= (language ~= "" and language or "en-US") then
         meta = tmdb.new(token, language, str("flix-tmdb-base-url"), str("flix-tmdb-image-url"),
                         vlc.config.userdatadir() .. "/flix-meta/" .. (str("flix-tmdb-base-url") ~= "" and "test" or "tmdb"))
-        meta:prepare()
+        if not meta:prepare() then
+            vlc.msg.warn("[flixsubs] the movie information cache cannot be written ("
+                         .. tostring(meta.cache_error) .. "): TMDB results will not be shown")
+        end
     end
     local request = vlc.var.get(libvlc, "flix-meta-request")
     if request and request ~= "" then
@@ -291,7 +294,11 @@ local function meta_step()
             vlc.var.set(libvlc, "flix-meta-update", key)
             busy = true
         elseif err then
-            log("metadata: " .. tostring(err))
+            if err == "cache_unavailable" then
+                vlc.msg.warn("[flixsubs] metadata skipped, the cache folder is not writable")
+            else
+                log("metadata: " .. tostring(err))
+            end
             break
         else
             break
@@ -300,8 +307,52 @@ local function meta_step()
     meta_busy = busy
 end
 
+-- VLCFlix settings: "Log in" / "Test" buttons. The request comes in "flix-account-request" (JSON,
+-- secrets inside: never logged), the answer goes out in "flix-account-result".
+local function account_step()
+    local text = vlc.var.get(libvlc, "flix-account-request")
+    if not text or text == "" then return end
+    vlc.var.set(libvlc, "flix-account-request", "")
+    local req = json.decode(text)
+    local result = { kind = "", ok = false, message = "Bad request." }
+    if type(req) == "table" then
+        result.kind = tostring(req.kind or "")
+        if req.kind == "opensubtitles" then
+            local password = (req.password and req.password ~= "") and req.password or str("flixsubs-password")
+            local key = (req.key and req.key ~= "") and req.key or str("flixsubs-api-key")
+            local client = api.new(key, VERSION, str("flixsubs-base-url"))
+            local ok, err = client:login(req.user or "", password)
+            if ok then
+                local left = client.account and client.account.remaining_downloads
+                result.ok = true
+                result.message = "Logged in as " .. tostring(req.user)
+                    .. (left and (", " .. tostring(left) .. " downloads left today") or "")
+            else
+                result.message = explain(err)
+            end
+        elseif req.kind == "tmdb" then
+            local token = (req.token and req.token ~= "") and req.token or str("flix-tmdb-token")
+            local service = tmdb.new(token, "en-US", str("flix-tmdb-base-url"), str("flix-tmdb-image-url"),
+                                     vlc.config.userdatadir() .. "/flix-meta/check")
+            local data, err = service:get("/configuration")
+            if data then
+                result.ok = true
+                result.message = "TMDB accepted the token."
+            elseif err == "unauthorized" then
+                result.message = "TMDB refused the token."
+            elseif err == "missing_token" then
+                result.message = "Enter the token first."
+            else
+                result.message = "Could not reach TMDB (" .. tostring(err) .. ")."
+            end
+        end
+    end
+    vlc.var.set(libvlc, "flix-account-result", json.encode(result))
+end
+
 local function step()
     pcall(meta_step)
+    pcall(account_step)
     -- the interface answered a subtitle offer
     local reply = vlc.var.get(libvlc, "flix-sub-reply")
     if reply and reply ~= "" then

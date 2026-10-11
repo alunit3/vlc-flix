@@ -44,7 +44,7 @@ function M.new(token, language, base, image_base, directory)
         language = (language and language ~= "") and language or "en-US",
         base = (base and base ~= "") and base or API,
         images = (image_base and image_base ~= "") and image_base or IMAGES,
-        dir = directory:gsub("[\\/]+$", ""),
+        dir = (directory:gsub("[\\/]+$", ""):gsub("\\", "/")),
         queue = {},
         queued = {},
         top10_at = 0,
@@ -56,15 +56,51 @@ function Service:path(...)
     return self.dir .. "/" .. table.concat({ ... }, "/")
 end
 
+-- vlc.io.mkdir is a plain mkdir(2): given a path whose parent is not there yet it stops with
+-- ENOENT and creates nothing at all. The cache root sits two levels down, and Settings >
+-- Storage > Clear deletes the whole tree, so every level is made here in order. EEXIST (17)
+-- means the directory is already there, which is the usual answer and not a failure.
+local function mkdirs(path)
+    path = path:gsub("\\", "/")
+    local prefix = path:match("^%a:") or ""            -- "D:" on Windows
+    if prefix == "" and path:sub(1, 1) == "/" then
+        prefix = "/"                                    -- absolute on posix
+    end
+    local acc = prefix
+    for part in (prefix ~= "" and path:sub(#prefix + 1) or path):gmatch("[^/]+") do
+        local tail = acc:sub(-1)
+        if acc == "" or tail == "/" then
+            acc = acc .. part
+        elseif tail == ":" then
+            acc = acc .. "/" .. part
+        else
+            acc = acc .. "/" .. part
+        end
+        local i_res, i_err = vlc.io.mkdir(acc, "0700")
+        if i_res ~= 0 and i_err ~= 17 then
+            return false, acc, i_err
+        end
+    end
+    return true
+end
+
+-- makes the cache tree. Returns false when a directory cannot be made at all: the answers
+-- can then be fetched but never saved, and that has to be told apart from a dead network.
 function Service:prepare()
+    self.cache_ok = true
     for _, sub in ipairs({ "", "movie", "posters", "backdrops", "discover", "detail" }) do
-        pcall(vlc.io.mkdir, sub == "" and self.dir or self:path(sub), "0700")
+        local ok, path, i_err = mkdirs(sub == "" and self.dir or self:path(sub))
+        if not ok then
+            self.cache_ok = false
+            self.cache_error = string.format("%s (error %d)", path, i_err or 0)
+        end
     end
     -- the Top 10 on disk is still good after a restart: do not fetch it again at every start
     local top = self:read_json(self:path("top10.json"))
     if type(top) == "table" and tonumber(top.fetched) and top.language == self.language then
         self.top10_at = tonumber(top.fetched)
     end
+    return self.cache_ok
 end
 
 local function read_file(path)
@@ -459,6 +495,9 @@ end
 -- Returns the key that changed ("top10" or a lookup key), or nil.
 function Service:step()
     if self.token == "" then return nil end
+    -- nothing could be saved even if the answer came: say that, instead of paying for a
+    -- request whose result is thrown away and letting it look like a network failure
+    if self.cache_ok == false then return nil, "cache_unavailable" end
     if self.blocked_until and now() < self.blocked_until and #self.queue > 0 then return nil end
     local req = table.remove(self.queue, 1)
     if req then

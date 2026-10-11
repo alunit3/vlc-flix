@@ -2149,7 +2149,12 @@ vlc_module_begin ()
               AUTOSTART_TEXT, AUTOSTART_LONGTEXT )
     add_bool( "playlist-cork", true, CORK_TEXT, CORK_LONGTEXT )
 #if defined(_WIN32) || defined(HAVE_DBUS) || defined(__OS2__)
-    add_bool( "one-instance", false, ONEINSTANCE_TEXT,
+    /* VLCFlix: on by default. A second instance has to hand its command line over to the
+     * running one and exit, which is the only way it never reaches the media library lock
+     * (see libvlc.c). Without this a second launch quietly becomes a full instance that
+     * blocks during startup and leaves every later launch without a media library.
+     * --no-one-instance still overrides it, which is how flix/dev.ps1 keeps its loop. */
+    add_bool( "one-instance", true, ONEINSTANCE_TEXT,
               ONEINSTANCE_LONGTEXT )
     add_bool( "started-from-file", false, STARTEDFROMFILE_TEXT,
               STARTEDFROMFILE_LONGTEXT )

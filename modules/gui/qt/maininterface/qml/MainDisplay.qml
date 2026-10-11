@@ -118,9 +118,11 @@ FocusScope {
     readonly property var pageModel: [
         {
             name: "home",
+            // flix: our own page for the "no media library" case: upstream's shows a bare
+            // cone, which says nothing about why there is no library to look at
             url: MainCtx.mediaLibraryAvailable ?
                  "qrc:///qt/qml/VLC/MediaLibrary/HomeDisplay.qml" :
-                 "qrc:///qt/qml/VLC/MainInterface/NoMedialibHome.qml"
+                 "qrc:///qt/qml/VLC/MainInterface/FlixNoMedialib.qml"
         }, {
             name: "flixsearch",
             url: "qrc:///qt/qml/VLC/MediaLibrary/FlixSearchDisplay.qml"

@@ -214,13 +214,6 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
 
     vlc_CPU_dump( VLC_OBJECT(p_libvlc) );
 
-    if( var_InheritBool( p_libvlc, "media-library") )
-    {
-        priv->p_media_library = libvlc_MlCreate( p_libvlc );
-        if ( priv->p_media_library == NULL )
-            msg_Warn( p_libvlc, "Media library initialization failed" );
-    }
-
     /*
      * Initialize hotkey handling
      */
@@ -262,6 +255,18 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
 
     /* System specific configuration */
     system_Configure( p_libvlc, i_argc - vlc_optind, ppsz_argv + vlc_optind );
+
+    /* The media library takes an exclusive lock on its database, and a process that loses
+     * that race blocks right here -- before any interface exists, so it has no window and
+     * nothing to close it with. In one-instance mode system_Configure() above has already
+     * handed this process over to the running one and exited, which is exactly why the
+     * library is only opened now: a second launch must never get as far as the lock. */
+    if( var_InheritBool( p_libvlc, "media-library") )
+    {
+        priv->p_media_library = libvlc_MlCreate( p_libvlc );
+        if ( priv->p_media_library == NULL )
+            msg_Warn( p_libvlc, "Media library initialization failed" );
+    }
 
 #ifdef ENABLE_VLM
     /* Initialize VLM if vlm-conf is specified */

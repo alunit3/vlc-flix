@@ -13,11 +13,23 @@ $run   = Join-Path $root "run"
 
 # Close any previous instance from the run tree (a stale window would otherwise be mistaken
 # for the new build, and it keeps the old plugin DLL open).
-Get-Process vlc -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } |
-    ForEach-Object { $_.CloseMainWindow() | Out-Null }
+# Every vlc.exe is closed, not only the ones with a window: an instance that lost the race for
+# the media library blocks in libvlc init, before Qt exists, and has no window at all. Skipping
+# those is how they pile up, and one of them holding ml.lock leaves every later launch without
+# a media library.
+Get-Process vlc -ErrorAction SilentlyContinue | ForEach-Object { $_.CloseMainWindow() | Out-Null }
 Start-Sleep -Seconds 3
-Get-Process vlc -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } |
-    Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process vlc -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+# Stop-Process and taskkill both report "no running instance" and leave the process in place
+# for some vlc.exe that are stuck before Qt starts up; WMI still terminates them. Without this
+# the leftovers survive every build, and the next VLC to start finds the media library locked.
+Start-Sleep -Seconds 2
+Get-CimInstance Win32_Process -Filter "Name='vlc.exe'" -ErrorAction SilentlyContinue |
+    ForEach-Object { try { Invoke-CimMethod -InputObject $_ -MethodName Terminate | Out-Null } catch {} }
+Start-Sleep -Seconds 1
+$left = @(Get-Process vlc -ErrorAction SilentlyContinue)
+if ($left.Count -gt 0) { Write-Host "warning: $($left.Count) vlc.exe could not be stopped; close them before testing" }
 
 # The control bar layout is saved in the portable settings and then wins over the defaults in the code.
 if ($ResetLayout) {

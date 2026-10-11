@@ -23,6 +23,7 @@ import VLC.MediaLibrary
 import VLC.MainInterface
 import VLC.Widgets as Widgets
 import VLC.Util
+import VLC.Dialogs
 import VLC.Style
 
 // flix: streaming-style Home. Replaces HomePage (same contract as far as
@@ -181,7 +182,7 @@ Widgets.PageExt {
                 width: parent.width
                 sideMargin: root.sideMargin
                 empty: allRow.count === 0
-                onAddFolder: History.push(["mlsettings"])
+                onAddFolder: DialogsProvider.prefsDialog()
             }
 
             FlixRow {

@@ -58,7 +58,7 @@ Item {
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: qsTr("Add the folder that holds your movies and series. Nothing is scanned until you do.")
+                text: qsTr("Preferences opens: choose Media Library and add the folder with your movies and series. Nothing is scanned until you do.")
                 color: "#B3B3B3"
                 font.pixelSize: VLCStyle.dp(15, VLCStyle.scale)
             }

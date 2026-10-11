@@ -1,4 +1,4 @@
-# Flix notices
+# VLCFlix notices
 
 This fork of VLC (GPL-2.0-or-later) includes work derived from other projects.
 

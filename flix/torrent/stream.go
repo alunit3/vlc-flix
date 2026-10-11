@@ -105,6 +105,7 @@ func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep boo
 	if err != nil {
 		return fail("cannot add torrent: " + err.Error())
 	}
+	addTrackers(t)
 	select {
 	case <-t.GotInfo():
 	case <-quit:

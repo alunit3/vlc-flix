@@ -33,6 +33,7 @@ func main() {
 	switch os.Args[1] {
 	case "sources":
 		fs := flag.NewFlagSet("sources", flag.ExitOnError)
+		fs.StringVar(&trackersFile, "trackers-file", "", "text file with extra trackers (one per line)")
 		imdb := fs.String("imdb", "", "IMDb id (tt...)")
 		season := fs.Int("season", 0, "season (series)")
 		episode := fs.Int("episode", 0, "episode (series)")
@@ -41,6 +42,7 @@ func main() {
 		os.Exit(runSources(*imdb, *season, *episode, *cache))
 	case "stream":
 		fs := flag.NewFlagSet("stream", flag.ExitOnError)
+		fs.StringVar(&trackersFile, "trackers-file", "", "text file with extra trackers (one per line)")
 		magnet := fs.String("magnet", "", "magnet link")
 		torrentFile := fs.String("torrent-file", "", "path of a .torrent file (instead of --magnet)")
 		fileIdx := fs.Int("file-idx", -1, "file index inside the torrent (-1: largest video)")
@@ -51,6 +53,7 @@ func main() {
 		os.Exit(runStream(*magnet, *torrentFile, *fileIdx, *dataDir, *keep, *parent))
 	case "files":
 		fs := flag.NewFlagSet("files", flag.ExitOnError)
+		fs.StringVar(&trackersFile, "trackers-file", "", "text file with extra trackers (one per line)")
 		magnet := fs.String("magnet", "", "magnet link")
 		torrentFile := fs.String("torrent-file", "", "path of a .torrent file")
 		dataDir := fs.String("data-dir", "", "scratch directory")

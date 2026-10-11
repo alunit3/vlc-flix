@@ -44,6 +44,7 @@ func runFiles(magnet, torrentFile, dataDir string) int {
 		emit(map[string]any{"error": "cannot add torrent: " + err.Error()})
 		return 1
 	}
+	addTrackers(t)
 	select {
 	case <-t.GotInfo():
 	case <-time.After(60 * time.Second):

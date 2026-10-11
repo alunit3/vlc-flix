@@ -25,15 +25,7 @@ var addons = []struct{ name, base string }{
 }
 
 const trackersURL = "https://cdn.jsdelivr.net/gh/ngosang/trackerslist@master/trackers_best.txt"
-
-var fallbackTrackers = []string{
-	"udp://tracker.opentrackr.org:1337/announce",
-	"udp://open.stealth.si:80/announce",
-	"udp://tracker.torrent.eu.org:451/announce",
-	"udp://open.demonii.com:1337/announce",
-	"udp://exodus.desync.com:6969/announce",
-	"udp://explodie.org:6969/announce",
-}
+const trackersAllURL = "https://cdn.jsdelivr.net/gh/ngosang/trackerslist@master/trackers_all_udp.txt"
 
 // Source is one torrent offered for a title.
 type Source struct {
@@ -139,23 +131,30 @@ func cached(cacheDir, key string, maxAge time.Duration, fetch func() ([]byte, er
 	return b, err
 }
 
+// loadTrackers: the user's trackers, the built-in list and ngosang's "best" and "all udp" lists
 func loadTrackers(cacheDir string) []string {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	b, err := cached(cacheDir, "trackers.txt", 24*time.Hour, func() ([]byte, error) { return httpGet(ctx, trackersURL) })
-	if err != nil {
-		return fallbackTrackers
-	}
-	var list []string
-	for _, l := range strings.Split(string(b), "\n") {
-		if l = strings.TrimSpace(l); strings.Contains(l, "://") {
-			list = append(list, l)
+	read := func(name, url string) []string {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		b, err := cached(cacheDir, name, 24*time.Hour, func() ([]byte, error) { return httpGet(ctx, url) })
+		if err != nil {
+			return nil
 		}
+		var list []string
+		for _, l := range strings.Split(string(b), "\n") {
+			if l = strings.TrimSpace(l); reTracker.MatchString(l) {
+				list = append(list, l)
+			}
+		}
+		return list
 	}
-	if len(list) == 0 {
-		return fallbackTrackers
-	}
-	return list
+	var best, all []string
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); best = read("trackers.txt", trackersURL) }()
+	go func() { defer wg.Done(); all = read("trackers-all-udp.txt", trackersAllURL) }()
+	wg.Wait()
+	return mergeTrackers(80, best, defaultTrackers, all)
 }
 
 func fetchAddon(cacheDir, name, base, path string) []Source {

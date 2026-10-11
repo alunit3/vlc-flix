@@ -209,6 +209,10 @@ Item {
                     height: VLCStyle.dp(44, VLCStyle.scale)
                     radius: VLCStyle.dp(4, VLCStyle.scale)
                     color: playHover.hovered ? "#BFBFBF" : "#FFFFFF"
+                    scale: playTap.pressed ? 0.96 : (playHover.hovered ? 1.03 : 1.0)
+
+                    Behavior on color { ColorAnimation { duration: 160 } }
+                    Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
                     Row {
                         id: playRow
@@ -235,6 +239,8 @@ Item {
                     HoverHandler { id: playHover; cursorShape: Qt.PointingHandCursor }
 
                     TapHandler {
+                        id: playTap
+
                         onTapped: {
                             if (slide.model.id !== undefined) {
                                 const p = slide.model.progress ?? 0
@@ -256,6 +262,10 @@ Item {
                     height: VLCStyle.dp(44, VLCStyle.scale)
                     radius: VLCStyle.dp(4, VLCStyle.scale)
                     color: infoHover.hovered ? Qt.rgba(0.43, 0.43, 0.45, 0.55) : Qt.rgba(0.43, 0.43, 0.45, 0.7)
+                    scale: infoTap.pressed ? 0.96 : (infoHover.hovered ? 1.03 : 1.0)
+
+                    Behavior on color { ColorAnimation { duration: 160 } }
+                    Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
                     Row {
                         id: infoRow
@@ -282,6 +292,8 @@ Item {
                     HoverHandler { id: infoHover; cursorShape: Qt.PointingHandCursor }
 
                     TapHandler {
+                        id: infoTap
+
                         onTapped: root.infoRequested({
                             id: slide.model.id,
                             title: slide.model.title,

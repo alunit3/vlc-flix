@@ -82,12 +82,29 @@ Item {
             id: entry
 
             required property var modelData
+            required property int index
 
             readonly property real posterWidth: VLCStyle.dp(150, VLCStyle.scale)
             readonly property real rankWidth: VLCStyle.dp(modelData.rank >= 10 ? 150 : 90, VLCStyle.scale)
 
             width: rankWidth + posterWidth
             height: list.height
+
+            // slides in from the right, one after the other
+            opacity: 0
+            transform: Translate { id: slide; x: VLCStyle.dp(60, VLCStyle.scale) }
+
+            ParallelAnimation {
+                id: entrance
+
+                PauseAnimation { duration: Math.min(entry.index, 8) * 60 }
+                ParallelAnimation {
+                    NumberAnimation { target: entry; property: "opacity"; to: 1; duration: 350; easing.type: Easing.OutCubic }
+                    NumberAnimation { target: slide; property: "x"; to: 0; duration: 450; easing.type: Easing.OutCubic }
+                }
+            }
+
+            Component.onCompleted: entrance.start()
 
             // outlined numeral, partly behind the poster as on the streaming services
             Text {

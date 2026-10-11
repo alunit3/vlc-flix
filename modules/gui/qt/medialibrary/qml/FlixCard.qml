@@ -68,6 +68,22 @@ Item {
         NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
     }
 
+    // appears with a short fade + rise, the first cards one after the other
+    opacity: 0
+    transform: Translate { id: rise; y: VLCStyle.dp(14, VLCStyle.scale) }
+
+    ParallelAnimation {
+        id: appear
+
+        PauseAnimation { duration: Math.min(root.index, 10) * 40 }
+        ParallelAnimation {
+            NumberAnimation { target: root; property: "opacity"; to: 1; duration: 320; easing.type: Easing.OutCubic }
+            NumberAnimation { target: rise; property: "y"; to: 0; duration: 380; easing.type: Easing.OutCubic }
+        }
+    }
+
+    Component.onCompleted: appear.start()
+
     Item {
         id: picture
 
@@ -88,6 +104,9 @@ Item {
             fillMode: Image.PreserveAspectCrop
             radius: root.radius
             backgroundColor: "transparent"
+            opacity: status === Image.Ready ? 1.0 : 0.0
+
+            Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
         }
 
         Text {

@@ -23,6 +23,14 @@ import VLC.Util
 StackViewExt {
     id: root
 
+    // flix: pages fade and settle in when the tab changes
+    replaceEnter: Transition {
+        ParallelAnimation {
+            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 260; easing.type: Easing.OutCubic }
+            NumberAnimation { property: "scale"; from: 0.985; to: 1; duration: 320; easing.type: Easing.OutCubic }
+        }
+    }
+
     // Properties
 
     //name of the loaded page

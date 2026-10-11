@@ -238,7 +238,7 @@ local function meta_step()
     local language = str("flix-meta-language")
     if not meta or meta.token ~= token or meta.language ~= (language ~= "" and language or "en-US") then
         meta = tmdb.new(token, language, str("flix-tmdb-base-url"), str("flix-tmdb-image-url"),
-                        vlc.config.userdatadir() .. "/flix-meta")
+                        vlc.config.userdatadir() .. "/flix-meta/" .. (str("flix-tmdb-base-url") ~= "" and "test" or "tmdb"))
         meta:prepare()
     end
     local request = vlc.var.get(libvlc, "flix-meta-request")

@@ -49,6 +49,13 @@ Rectangle {
 
     Behavior on opacity { NumberAnimation { duration: 250 } }
 
+    // slides up from below
+    transform: Translate {
+        y: root.armed ? 0 : VLCStyle.dp(24, VLCStyle.scale)
+
+        Behavior on y { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+    }
+
     width: row.implicitWidth + 2 * VLCStyle.dp(22, VLCStyle.scale)
     height: VLCStyle.dp(48, VLCStyle.scale)
     radius: VLCStyle.dp(6, VLCStyle.scale)

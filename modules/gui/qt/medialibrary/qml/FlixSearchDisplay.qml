@@ -73,6 +73,7 @@ Widgets.PageLoader {
             property int loadedPage: 0
             property int totalPages: 1
             property bool waiting: false
+            property bool failed: false
             property var genreList: []
 
             readonly property var onlineSorts: [
@@ -114,6 +115,8 @@ Widgets.PageLoader {
                 const answer = MainCtx.discover(Object.assign({ page: pageNumber }, requestParams))
                 if (answer.ready) {
                     waiting = false
+                    failed = false
+                    giveUp.stop()
                     if (pageNumber <= loadedPage)
                         return
                     results = pageNumber === 1 ? answer.items : results.concat(answer.items)
@@ -121,11 +124,26 @@ Widgets.PageLoader {
                     totalPages = answer.totalPages
                 } else {
                     waiting = true
+                    failed = false
                     pendingPage = pageNumber
+                    giveUp.restart()
                 }
             }
 
             property int pendingPage: 1
+
+            // no answer from TMDB (no network, wrong token): say so instead of waiting forever
+            Timer {
+                id: giveUp
+
+                interval: 25000
+                onTriggered: {
+                    if (page.waiting) {
+                        page.waiting = false
+                        page.failed = true
+                    }
+                }
+            }
 
             function toggleGenre(id) {
                 const list = genreIds.slice()
@@ -191,6 +209,10 @@ Widgets.PageLoader {
                 height: VLCStyle.dp(30, VLCStyle.scale)
                 radius: height / 2
                 color: selected ? "#FFFFFF" : (chipHover.hovered ? "#3A3A3A" : "#2A2A2A")
+                scale: chipTap.pressed ? 0.95 : 1.0
+
+                Behavior on color { ColorAnimation { duration: 160 } }
+                Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.OutCubic } }
 
                 Text {
                     id: chipLabel
@@ -203,7 +225,7 @@ Widgets.PageLoader {
                 }
 
                 HoverHandler { id: chipHover; cursorShape: Qt.PointingHandCursor }
-                TapHandler { onTapped: chip.clicked() }
+                TapHandler { id: chipTap; onTapped: chip.clicked() }
             }
 
             // a labelled row of controls
@@ -449,12 +471,56 @@ Widgets.PageLoader {
                     }
 
                     // --- online results ---------------------------------------------------
-                    Text {
-                        visible: page.online
-                        text: page.waiting ? qsTr("Searching…")
-                                           : (page.results.length === 0 ? qsTr("No results.") : "")
-                        color: "#B3B3B3"
-                        font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
+                    Row {
+                        visible: page.online && (page.waiting || page.failed || page.results.length === 0)
+                        spacing: VLCStyle.dp(10, VLCStyle.scale)
+
+                        // spinner
+                        Item {
+                            id: spinner
+
+                            visible: page.waiting
+                            width: VLCStyle.dp(18, VLCStyle.scale)
+                            height: width
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: width / 2
+                                color: "transparent"
+                                border.width: VLCStyle.dp(2, VLCStyle.scale)
+                                border.color: "#4D4D4D"
+                            }
+
+                            Rectangle {
+                                width: VLCStyle.dp(5, VLCStyle.scale)
+                                height: width
+                                radius: width / 2
+                                color: "#E50914"
+                                x: parent.width / 2 - width / 2
+                                y: -height / 4
+
+                                transform: Rotation {
+                                    origin.x: VLCStyle.dp(2.5, VLCStyle.scale)
+                                    origin.y: VLCStyle.dp(11.5, VLCStyle.scale)
+                                    angle: spinner.spin
+                                }
+                            }
+
+                            property real spin: 0
+
+                            NumberAnimation on spin {
+                                from: 0; to: 360; duration: 900; loops: Animation.Infinite
+                                running: page.waiting
+                            }
+                        }
+
+                        Text {
+                            text: page.waiting ? qsTr("Searching…")
+                                : page.failed ? qsTr("Could not reach TMDB. Check your access token and connection in Preferences.")
+                                : qsTr("No results.")
+                            color: "#B3B3B3"
+                            font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
+                        }
                     }
 
                     Flow {
@@ -469,9 +535,26 @@ Widgets.PageLoader {
                                 id: tile
 
                                 required property var modelData
+                                required property int index
 
                                 width: VLCStyle.dp(170, VLCStyle.scale)
                                 height: VLCStyle.dp(255 + 44, VLCStyle.scale)
+
+                                // fade + rise in, row by row
+                                opacity: 0
+                                transform: Translate { id: tileRise; y: VLCStyle.dp(16, VLCStyle.scale) }
+
+                                ParallelAnimation {
+                                    id: tileAppear
+
+                                    PauseAnimation { duration: (tile.index % 9) * 35 }
+                                    ParallelAnimation {
+                                        NumberAnimation { target: tile; property: "opacity"; to: 1; duration: 300; easing.type: Easing.OutCubic }
+                                        NumberAnimation { target: tileRise; property: "y"; to: 0; duration: 360; easing.type: Easing.OutCubic }
+                                    }
+                                }
+
+                                Component.onCompleted: tileAppear.start()
 
                                 Rectangle {
                                     id: poster

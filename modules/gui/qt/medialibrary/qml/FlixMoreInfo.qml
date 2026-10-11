@@ -32,17 +32,38 @@ Item {
     // an online title has no file to play: only the IMDb / Heartive buttons
     readonly property bool isWeb: item !== null && item.id === undefined
 
+    // true while the card is up; the item stays set until the exit animation is done
+    property bool shown: false
+
     function open(entry) {
+        closeTimer.stop()
         item = entry
+        shown = true
         forceActiveFocus()
     }
 
     function close() {
-        item = null
+        if (!shown)
+            return
+        shown = false
+        closeTimer.restart()
+    }
+
+    Timer {
+        id: closeTimer
+
+        interval: 240
+        onTriggered: root.item = null
     }
 
     visible: item !== null
     z: 100
+
+    opacity: shown ? 1.0 : 0.0
+
+    Behavior on opacity {
+        NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+    }
 
     readonly property string rawTitle: item ? (item.title ?? "") : ""
     readonly property var info: isWeb ? ({ isEpisode: false, year: item.year ?? 0, resolution: "" })
@@ -127,12 +148,20 @@ Item {
 
     Keys.onEscapePressed: root.close()
 
-    // dim the page behind
+    // dim the page behind; the MouseArea eats every click, hover and wheel event so nothing
+    // below the popup can be reached while it is up
     Rectangle {
         anchors.fill: parent
         color: Qt.rgba(0, 0, 0, 0.72)
 
-        TapHandler { onTapped: root.close() }
+        MouseArea {
+            anchors.fill: parent
+            enabled: root.shown
+            hoverEnabled: true
+            acceptedButtons: Qt.AllButtons
+            onClicked: root.close()
+            onWheel: (wheel) => wheel.accepted = true
+        }
     }
 
     Rectangle {
@@ -146,8 +175,22 @@ Item {
         color: "#181818"
         clip: true
 
+        // pops up: slightly smaller and lower, then eases into place
+        scale: root.shown ? 1.0 : 0.94
+        transform: Translate { y: root.shown ? 0 : VLCStyle.dp(18, VLCStyle.scale)
+                               Behavior on y { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } } }
+
+        Behavior on scale {
+            NumberAnimation { duration: 280; easing.type: Easing.OutBack; easing.overshoot: 0.9 }
+        }
+
         // swallow clicks so the dimmed backdrop does not close the card
-        TapHandler {}
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.AllButtons
+            onWheel: (wheel) => wheel.accepted = true
+        }
 
         Item {
             id: banner
@@ -160,6 +203,9 @@ Item {
                 source: root.backdropUrl !== "" ? root.backdropUrl : (root.item ? (root.item.thumbnail || "") : "")
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
+                opacity: status === Image.Ready ? 1.0 : 0.0
+
+                Behavior on opacity { NumberAnimation { duration: 350; easing.type: Easing.OutCubic } }
             }
 
             Rectangle {
@@ -202,7 +248,7 @@ Item {
                 }
 
                 HoverHandler { id: closeHover; cursorShape: Qt.PointingHandCursor }
-                TapHandler { onTapped: root.close() }
+                TapHandler { gesturePolicy: TapHandler.ReleaseWithinBounds; onTapped: root.close() }
             }
         }
 
@@ -282,6 +328,10 @@ Item {
                         radius: VLCStyle.dp(4, VLCStyle.scale)
                         color: modelData.primary ? (btnHover.hovered ? "#BFBFBF" : "#FFFFFF")
                                                  : (btnHover.hovered ? Qt.rgba(0.43, 0.43, 0.45, 0.55) : Qt.rgba(0.43, 0.43, 0.45, 0.7))
+                        scale: btnTap.pressed ? 0.96 : (btnHover.hovered ? 1.03 : 1.0)
+
+                        Behavior on color { ColorAnimation { duration: 160 } }
+                        Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
                         Text {
                             id: btnLabel
@@ -295,6 +345,10 @@ Item {
 
                         HoverHandler { id: btnHover; cursorShape: Qt.PointingHandCursor }
                         TapHandler {
+                            id: btnTap
+
+                            gesturePolicy: TapHandler.ReleaseWithinBounds
+
                             onTapped: {
                                 switch (btn.modelData.kind) {
                                 case "play": root.play(false); break

@@ -69,6 +69,10 @@ Item {
                 height: VLCStyle.dp(40, VLCStyle.scale)
                 radius: VLCStyle.dp(4, VLCStyle.scale)
                 color: addHover.hovered ? "#BFBFBF" : "#FFFFFF"
+                scale: addTap.pressed ? 0.96 : (addHover.hovered ? 1.03 : 1.0)
+
+                Behavior on color { ColorAnimation { duration: 160 } }
+                Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
 
                 Text {
                     id: addLabel
@@ -81,7 +85,7 @@ Item {
                 }
 
                 HoverHandler { id: addHover; cursorShape: Qt.PointingHandCursor }
-                TapHandler { onTapped: root.addFolder() }
+                TapHandler { id: addTap; onTapped: root.addFolder() }
             }
         }
     }

@@ -711,12 +711,17 @@ QVariantMap MainCtx::releaseInfo(const QString &name) const
     return map;
 }
 
-static QString metaDirectory()
+// the cache is split by source so test servers can never mix with the real TMDB data
+static QString metaDirectory( qt_intf_t *intf )
 {
     char *dir = config_GetUserDir( VLC_USERDATA_DIR );
     if( dir == nullptr )
         return QString();
-    const QString path = QDir::fromNativeSeparators( qfu( dir ) ) + QStringLiteral("/flix-meta");
+    char *base = var_InheritString( intf, "flix-tmdb-base-url" );
+    const bool custom = base != nullptr && base[0] != '\0';
+    free( base );
+    const QString path = QDir::fromNativeSeparators( qfu( dir ) ) + QStringLiteral("/flix-meta/")
+                       + ( custom ? QStringLiteral("test") : QStringLiteral("tmdb") );
     free( dir );
     return path;
 }
@@ -786,7 +791,7 @@ QVariantMap MainCtx::meta(const QString &name)
     const QString key = QStringLiteral("%1%2-%3-%4").arg( tv ? QStringLiteral("tv-") : QString(),
         slug ).arg( year ).arg( language.toLower() );
 
-    const QString directory = metaDirectory();
+    const QString directory = metaDirectory( p_intf );
     QFile file( directory + QStringLiteral("/movie/") + key + QStringLiteral(".json") );
     if( file.open( QIODevice::ReadOnly ) )
     {
@@ -875,7 +880,7 @@ static QHash<int, QString> genreNames( const QString &directory, const QString &
 QVariantList MainCtx::genres(const QString &type) const
 {
     QVariantList result;
-    QFile file( metaDirectory() + QStringLiteral("/genres.json") );
+    QFile file( metaDirectory( p_intf ) + QStringLiteral("/genres.json") );
     if( !file.open( QIODevice::ReadOnly ) )
         return result;
     const QJsonArray list = QJsonDocument::fromJson( file.readAll() ).object()
@@ -910,7 +915,7 @@ QVariantMap MainCtx::discover(const QVariantMap &params)
     const QString key = QStringLiteral("d-") + QString::fromLatin1(
         QCryptographicHash::hash( canonical, QCryptographicHash::Sha1 ).toHex().left( 20 ) );
 
-    const QString directory = metaDirectory();
+    const QString directory = metaDirectory( p_intf );
     QFile file( directory + QStringLiteral("/discover/") + key + QStringLiteral(".json") );
     bool refresh = true;
     if( file.open( QIODevice::ReadOnly ) )
@@ -969,7 +974,7 @@ QVariantMap MainCtx::webDetail(int tmdbId, const QString &type)
     const QString kind = type == QLatin1String("tv") ? QStringLiteral("tv") : QStringLiteral("movie");
     const QString key = QStringLiteral("w-%1-%2-%3").arg( kind ).arg( tmdbId ).arg( metaLanguage( p_intf ).toLower() );
 
-    const QString directory = metaDirectory();
+    const QString directory = metaDirectory( p_intf );
     QFile file( directory + QStringLiteral("/movie/") + key + QStringLiteral(".json") );
     if( file.open( QIODevice::ReadOnly ) )
     {
@@ -992,7 +997,7 @@ QVariantMap MainCtx::webDetail(int tmdbId, const QString &type)
 QVariantList MainCtx::topTen() const
 {
     QVariantList result;
-    const QString directory = metaDirectory();
+    const QString directory = metaDirectory( p_intf );
     QFile file( directory + QStringLiteral("/top10.json") );
     if( !file.open( QIODevice::ReadOnly ) )
         return result;

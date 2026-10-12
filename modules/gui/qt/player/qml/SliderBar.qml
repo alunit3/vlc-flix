@@ -687,7 +687,7 @@ T.ProgressBar {
                 (Number(stats.position ?? 0) + Number(stats.buffered ?? 0)) / total))
             readonly property bool wanted: {
                 const where = String(MainCtx.flixPref("torrent/progressWhere", "both"))
-                return (where === "both" || where === "bar") && stats.total !== undefined
+                return MainCtx.torrentActive && (where === "both" || where === "bar") && stats.total !== undefined
             }
 
             x: played * parent.width

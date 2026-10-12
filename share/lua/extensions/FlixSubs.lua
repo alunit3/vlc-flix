@@ -210,6 +210,9 @@ local function download()
         return
     end
     last_path = saved
+    -- the subtitle service attaches it again the next time this film plays; a stream comes
+    -- back on a new address, and the user's subtitles folder is not searched by VLC itself
+    api.remember(api.media_key(uri), saved)
 
     local added = false
     -- the second argument is autoselect, not the OSD flag: pick the subtitle straight

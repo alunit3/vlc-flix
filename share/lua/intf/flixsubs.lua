@@ -184,6 +184,8 @@ local function download_and_enable(client, offer)
     end
 
     vlc.player.add_subtitle(saved, true)
+    -- so the next time this film plays it gets the same subtitle back (see restore)
+    api.remember(api.media_key(offer.uri), saved)
     notify(string.format("Subtitles added (%s): %s", offer.row.language, offer.display))
 end
 
@@ -252,6 +254,30 @@ local function consider(uri)
             release = row.release, hash_match = row.hash_match }))
     else
         download_and_enable(client, offer)
+    end
+end
+
+-- Attaches the subtitle downloaded for this film last time. Not a search, so it runs even
+-- with automatic subtitles off: it gives back what the user already chose.
+local function restore(uri)
+    local key = api.media_key(uri)
+    local path = api.recall(key)
+    if not path then
+        log("no saved subtitle for " .. tostring(key))
+        return
+    end
+    -- next to a local film VLC has picked it up by its name already; adding it again would
+    -- list the same subtitle twice
+    if uri:match("^file://") and flag("sub-autodetect-file", true) then
+        local media = vlc.strings.make_path(uri)
+        if media and dirname(media) == dirname(path) then return end
+    end
+    -- VLC turns a Windows path into an address only when a backslash follows the drive
+    -- letter: "D:/..." is refused without a word and nothing would be attached
+    if path:match("^%a:/") then path = path:gsub("/", "\\") end
+    if pcall(vlc.player.add_subtitle, path, true) then
+        handled[uri] = true     -- it has subtitles now: no offer to download them again
+        log("restored subtitle " .. path)
     end
 end
 
@@ -350,7 +376,22 @@ local function account_step()
     vlc.var.set(libvlc, "flix-account-result", json.encode(result))
 end
 
+-- The subtitle chosen last time goes back on as soon as a film is playing. This runs first
+-- in every tick: the metadata queue below can hold the loop for a long while at start-up
+-- (the Home page asks for every poster at once), and a restore waiting behind it showed up
+-- half a minute into the film.
+local restored_uri = nil
+local function restore_step()
+    local item = vlc.player.item()
+    local uri = item and item:uri()
+    if not uri or uri == restored_uri then return end
+    restored_uri = uri
+    local ok, err = pcall(restore, uri)
+    if not ok then vlc.msg.warn("[flixsubs] could not restore the saved subtitle: " .. tostring(err)) end
+end
+
 local function step()
+    restore_step()
     pcall(meta_step)
     pcall(account_step)
     -- the interface answered a subtitle offer
@@ -360,8 +401,6 @@ local function step()
         answer(reply)
     end
     if pending and vlc.misc.mdate() > pending.expires then pending = nil end
-
-    if not flag("flixsubs-auto", true) then return end
 
     local item = vlc.player.item()
     if not item then
@@ -374,6 +413,8 @@ local function step()
         current, since, checked = uri, vlc.misc.mdate(), false
         pending = nil
     end
+
+    if not flag("flixsubs-auto", true) then return end
 
     -- give the input a few seconds to create its tracks (and pick up a subtitle file)
     if not checked and vlc.misc.mdate() - since > 4000000 then

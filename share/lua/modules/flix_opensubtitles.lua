@@ -343,4 +343,66 @@ function M.save(body, directories, stem, language, id)
     return nil, "save_failed"
 end
 
+------------------------------------------------------------------------------
+-- remembered subtitles
+------------------------------------------------------------------------------
+-- A downloaded subtitle used to be saved and then forgotten. Next to a local film VLC finds
+-- it again by its name, but a torrent stream is a new http://127.0.0.1:<port>/ address on
+-- every start, and a file kept in the user's subtitles folder is never looked for. So the
+-- film came back without its subtitle and the service offered to download it again. The
+-- map below keeps, per film, the subtitle chosen last.
+
+local function remembered_file()
+    return vlc.config.userdatadir() .. "/subtitles/flix-subs.json"
+end
+
+local function read_remembered(json)
+    local file = vlc.io.open(remembered_file(), "rb")
+    if not file then return {} end
+    local text = file:read("*a")
+    file:close()
+    local map = text and json.decode(text) or nil
+    return type(map) == "table" and map or {}
+end
+
+-- What a film is known by: its address, or for a torrent stream the torrent and file it
+-- plays (published by the interface in "flix-stream-info"). nil when there is nothing
+-- stable to go by.
+function M.media_key(uri)
+    if not uri or uri == "" then return nil end
+    if uri:match("^http://127%.0%.0%.1:%d+/") then
+        local json = require("dkjson")
+        local text = vlc.var.get(vlc.object.libvlc(), "flix-stream-info")
+        local data = text and text ~= "" and json.decode(text) or nil
+        if type(data) ~= "table" or type(data.key) ~= "string" or data.key == "" then return nil end
+        return "stream:" .. data.key
+    end
+    return uri
+end
+
+-- Keeps path as the subtitle of the film known by key.
+function M.remember(key, path)
+    if not key or not path then return false end
+    local json = require("dkjson")
+    pcall(vlc.io.mkdir, vlc.config.userdatadir() .. "/subtitles", "0700")
+    local map = read_remembered(json)
+    map[key] = path
+    local file = vlc.io.open(remembered_file(), "wb")
+    if not file then return false end
+    local written = file:write(json.encode(map))
+    file:close()
+    return written and true or false
+end
+
+-- The subtitle kept for key, or nil when there is none or the file has gone since.
+function M.recall(key)
+    if not key then return nil end
+    local path = read_remembered(require("dkjson"))[key]
+    if type(path) ~= "string" then return nil end
+    local probe = vlc.io.open(path, "rb")
+    if not probe then return nil end
+    probe:close()
+    return path
+end
+
 return M

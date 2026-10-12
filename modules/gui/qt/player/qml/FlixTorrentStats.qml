@@ -31,7 +31,9 @@ Rectangle {
     id: root
 
     readonly property var stats: MainCtx.torrentStats
-    readonly property bool active: stats.speedBps !== undefined
+    // only while our stream is what plays: the helper can still be reporting for a moment
+    // after a local film has taken over, and its numbers must not be drawn over that film
+    readonly property bool active: MainCtx.torrentActive && stats.speedBps !== undefined
 
     // where the download progress is shown; the seek bar draws the same number itself
     readonly property string progressWhere: String(MainCtx.flixPref("torrent/progressWhere", "both"))

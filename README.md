@@ -1,140 +1,152 @@
-# VLC media player
+# VLCFlix
 
-**VLC** is a libre and open source **media player** and **multimedia engine**,
-focused on **playing everything**, and **running everywhere**.
+VLC 4 with the front end of a streaming service: a Home screen for your own films, artwork
+and synopses from TMDB, subtitles from OpenSubtitles, and torrent streaming that picks up
+exactly where you stopped. Underneath it is still VLC, so it plays everything VLC plays.
 
-**VLC** can play most multimedia files, discs, streams, devices and is also able to
-convert, encode, **stream** and manipulate streams into numerous formats.
+![Home: Continue Watching with the title's artwork, and the weekly Top 10](docs/screenshots/home.jpg)
 
-VLC is used by many over the world, on numerous platforms, for very different use cases.
+**[Download for Windows](https://github.com/alunit3/vlc-flix/releases/latest)**: installer
+or zip, Windows 10/11 64-bit.
 
-The **engine of VLC** can be embedded into 3rd party applications, and is called *libVLC*.
+---
 
-**VLC** is part of the [VideoLAN project](https://videolan.org) and
-is developed and supported by a community of volunteers.
+## What it adds to VLC
 
-The VideoLAN project was started at the university [École Centrale Paris](https://www.centralesupelec.fr/) who
-relicensed VLC under the GPLv2 license in February 2001. Since then, VLC has
-been downloaded **billions** of times.
+### A Home screen that knows what you watch
+
+Continue Watching sits at the top: local files, torrents and online players alike, each with
+its position. Below are your library, recently added files and TMDB's weekly Top 10. Point
+**Add movie folder** at your films and they show up with posters and synopses instead of
+file names. Release names like `Some.Movie.2001.1080p.BluRay.x264` are cleaned up to
+"Some Movie (2001)" everywhere titles are shown.
+
+### Search and More Info
+
+![Search by genre, year and rating](docs/screenshots/search.jpg)
+
+Search TMDB by title, or browse by genre, decade, rating and popularity, for films and
+series. Every card opens a details panel with the synopsis, runtime and rating, and two
+ways to watch: **Stream** (torrent) or **Watch online** (a streaming provider's own player
+in a separate window). Films from your library play from your own copy.
+
+![More Info panel](docs/screenshots/more-info.jpg)
+
+### Torrent streaming
+
+![Stream a magnet link: pick the file first](docs/screenshots/magnet.jpg)
+
+Pick a source for a title (sorted by seeders, filtered by quality, CAM releases hidden), or
+paste your own magnet link or `.torrent` file and choose which file to play. Playback starts
+while it downloads, and a small card in the player shows speed, peers and progress.
+
+![The player streaming, with the torrent card](docs/screenshots/player.jpg)
+
+Resuming is fast because nothing is thrown away. Each torrent keeps its own folder on disk
+(capped at a size you choose, oldest removed first), its metadata is saved, and the player
+opens directly at the saved second instead of starting from the beginning. On the test
+torrent a resume is ready in under a second.
+
+By default only the part you are about to watch is fetched. Settings switch that to
+downloading the whole file, set the buffer sizes and cap the speeds.
+
+### The player
+
+![Pause screen with the title, year, age rating and synopsis](docs/screenshots/pause.jpg)
+
+- Pausing with the mouse idle shows what you are watching: title, year, age rating, runtime
+  and synopsis.
+- A title starts with its age rating in the corner, and a resumed one says
+  "Resuming from 12:34" with a **Start over** button.
+- Hovering the seek bar shows a frame from that point.
+- When a film starts without subtitles, VLCFlix finds the best match on OpenSubtitles and
+  offers it, or adds it straight away if you prefer. A **Find Subtitles Online** window
+  searches by hand. Either way, the subtitle you chose comes back on its own the next time
+  you play that film.
+
+### Settings in one place
+
+![Settings: torrents](docs/screenshots/settings.jpg)
+
+Accounts with a Test button for each key, library and metadata language, subtitle
+languages, playback, torrent behaviour, and a Storage page that shows what each cache takes
+on disk and clears it. VLC's full preferences are still there for everything else.
+
+### Smaller things
+
+- Its own settings folder (`%APPDATA%\VLCFlix`) and app identity, so it installs next to a
+  regular VLC without sharing settings, the taskbar group or the single-instance lock.
+- Checks this repository's releases once a day and says on Home when there is a newer
+  version. It can be switched off in Settings → About.
+- Fixed in the VLC code it is built on: crackling 5.1 audio through WASAPI (a channel
+  reorder applied twice to partly written blocks), Lua extensions that could not be reopened
+  after their thread ended, and a few stack leaks in the Lua dialog code.
+
+---
+
+## Getting started
+
+1. Install, run `vlcflix.exe`.
+2. In **Settings → Accounts**, add a free [TMDB read access token](https://www.themoviedb.org/settings/api)
+   for artwork, search and the Top 10, and an [OpenSubtitles](https://www.opensubtitles.com/consumers)
+   API key and account for subtitles. Nothing is fetched until these are set, and they stay
+   on your PC.
+3. **Add movie folder** on Home, or stream something.
+
+Watch online needs the Microsoft Edge WebView2 runtime, which is part of Windows 11.
+
+The installer is not code-signed yet, so SmartScreen warns the first time (More info → Run
+anyway). The first torrent stream also brings up a Windows Firewall prompt for
+`flixtorrent.exe`; streaming works either way, and allowing it lets more peers connect to you.
+
+---
+
+## Building
+
+The Windows build runs in VideoLAN's own build container, with prebuilt dependencies, so the
+only things needed locally are Docker Desktop and Go 1.24+.
+
+```powershell
+.\flix\build.ps1 -Package -Jobs 4   # first, full build; a runnable tree lands in ..\run
+.\flix\dev.ps1                      # afterwards: incremental build, swaps the new files in
+.\flix\dev.ps1 -Launch              # ...and starts it
+```
+
+`dev.ps1` also rebuilds the two Go helpers (`flixtorrent.exe`, `flixweb.exe`) when their
+sources change. Give Docker Desktop plenty of memory (Settings → Resources); with 2 GB
+the build runs out of it.
+
+Releases are built by GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)
+and [`flix/ci/build-win64.sh`](flix/ci/build-win64.sh)). Run the **Build** workflow by hand
+for test artifacts, or push a tag `vX.Y.Z` matching `FLIX_VERSION` in `configure.ac` to get
+a draft release with the installer, the zip and `SHA256SUMS`.
+
+### Where things live
+
+| Path | What |
+| --- | --- |
+| `modules/gui/qt/**/Flix*.qml` | The VLCFlix screens: Home, Search, More Info, dialogs, player overlays, Settings |
+| `modules/gui/qt/maininterface/mainctx.cpp` | Glue between the screens and everything else: torrent sessions, resume, storage, settings |
+| `share/lua/intf/flixsubs.lua` | Background service: TMDB metadata, OpenSubtitles, remembered subtitles, update check |
+| `share/lua/extensions/FlixSubs.lua` | The **Find Subtitles Online** window |
+| `flix/torrent/` | Torrent helper (Go, [anacrolix/torrent](https://github.com/anacrolix/torrent)): sources, metadata, local HTTP stream |
+| `flix/web/` | Watch online window (Go, WebView2) |
+| `src/text/release_name.c` | Release-name parser behind the cleaned-up titles |
+| `flix/UPSTREAM` | The VLC commit this is based on, and the build image |
+
+---
+
+## Notes
+
+- VLCFlix does not host, index or search for media on its own. Torrent sources come from
+  public Stremio addons, and nothing is downloaded until you pick a source and press Stream.
+  Torrent peers see your IP address. You are responsible for what you stream.
+- This product uses the TMDB API but is not endorsed or certified by TMDB.
+- Not affiliated with VideoLAN or Netflix. "VLC" and the cone are trademarks of VideoLAN.
+- Third-party code and services are listed in [`flix/NOTICE.md`](flix/NOTICE.md).
 
 ## License
 
-**VLC** is released under the GPLv2 *(or later)* license.
-*On some platforms, it is de facto GPLv3, because of the licenses of dependencies*.
-
-**libVLC**, the engine is released under the LGPLv2 *(or later)* license. \
-This allows embedding the engine in 3rd party applications, while letting them to be licensed under other licenses.
-
-# Platforms
-
-VLC is available for the following platforms:
-- [Windows] *(from 7 and later, including UWP platforms and all versions of Windows 10)*
-- [macOS] *(10.10 and later)*
-- [GNU/Linux] and affiliated
-- [BSD] and affiliated
-- [Android] *(4.2 and later)*, including Android TV and Android Auto
-- [iOS] *(9 and later)*, including AppleTV and iPadOS
-- Haiku, OS/2 and a few others.
-
-[Windows]: https://www.videolan.org/vlc/download-windows.html
-[macOS]: https://www.videolan.org/vlc/download-macosx.html
-[GNU/Linux]: https://www.videolan.org/vlc/#download
-[BSD]: https://www.videolan.org/vlc/download-freebsd.html
-[Android]: https://www.videolan.org/vlc/download-android.html
-[iOS]: https://www.videolan.org/vlc/download-ios.html
-
-Not all platforms receive the same amount of care, due to our limited resources.
-
-**Nota Bene**: The [Android app](https://code.videolan.org/videolan/vlc-android/) and
-the [iOS app](https://code.videolan.org/videolan/vlc-ios/) are located in different repositories
-than the main one.
-
-# Contributing & Community
-
-**VLC** is maintained by a community of people, and VideoLAN is not paying any of them.\
-The community is composed of developers, helpers, maintainers, designers and writers that want
-this open source project to thrive.
-
-The main development of VLC is done in the C language, but this repository also contains
-plenty of C++, Obj-C, asm and Rust.
-
-Other repositories linked to vlc are done in languages including Kotlin/Java [(Android)](https://code.videolan.org/videolan/vlc-android/),
-Swift [(iOS)](https://code.videolan.org/videolan/vlc-ios/), and C# [(libVLCSharp)](https://code.videolan.org/videolan/libvlcsharp/).
-
-We need help with the following tasks:
-- Coding
-- Packaging for Windows, macOS and Linux distributions
-- Technical writing for the documentation
-- Design
-- Support
-- Community management and communication.
-
-Please contribute :)
-
-We are on IRC. You can find us on the **#videolan** channel on *[Libera.chat]*.
-
-[Libera.chat]: https://libera.chat
-
-## Contributions
-
-Contributions are now done through Merge Requests on our [GitLab repository](https://code.videolan.org/videolan/vlc/).
-
-CI and discussions should be resolved before a Merge Request can be merged.
-
-# libVLC
-
-**libVLC** is an embeddable engine for 3rd party applications and frameworks.
-
-It runs on the same platforms as VLC *(and sometimes on more)* and can provide playback,
-streaming and conversion of multimedia files and streams.
-
-
-**libVLC** has numerous bindings for other languages, such as C++, Python and C#.
-
-# Support
-
-## Links
-
-Some useful links that might help you:
-
-- [VLC web site](https://www.videolan.org/vlc/)
-- [Support](https://www.videolan.org/support/)
-- [Forums](https://forum.videolan.org/)
-- [Wiki](https://wiki.videolan.org/)
-- [Developer's Corner](https://wiki.videolan.org/Developers_Corner)
-- [VLC hacking guide](https://wiki.videolan.org/Hacker_Guide)
-- [Bugtracker](https://code.videolan.org/videolan/vlc/-/issues)
-- [VideoLAN web site](https://www.videolan.org/)
-
-## Source Code sitemap
-```
-ABOUT-NLS          - Notes on the Free Translation Project.
-AUTHORS            - VLC authors.
-COPYING            - The GPL license.
-COPYING.LIB        - The LGPL license.
-INSTALL            - Installation and building instructions.
-NEWS               - Important modifications between the releases.
-README             - Project summary.
-THANKS             - VLC contributors.
-
-bin/               - VLC binaries.
-bindings/          - libVLC bindings to other languages.
-compat/            - compatibility library for operating systems missing
-                     essential functionalities.
-contrib/           - Facilities for retrieving external libraries and building
-                     them for systems that don't have the right versions.
-doc/               - Miscellaneous documentation.
-extras/analyser    - Code analyser and editor specific files.
-extras/buildsystem - Different build system specific files.
-extras/misc        - Files that don't fit in the other extras/ categories.
-extras/package     - VLC packaging specific files such as spec files.
-extras/tools/      - Facilities for retrieving external building tools needed
-                     for systems that don't have the right versions.
-include/           - Header files.
-lib/               - libVLC source code.
-modules/           - VLC plugins and modules. Most of the code is here.
-po/                - VLC translations.
-share/             - Common resource files.
-src/               - libvlccore source code.
-test/              - Testing system.
-```
+VLCFlix is a fork of [VLC](https://code.videolan.org/videolan/vlc) and, like VLC, is released
+under the GNU General Public License, version 2 or later ([COPYING](COPYING)). libVLC keeps
+its LGPL-2.1-or-later license.

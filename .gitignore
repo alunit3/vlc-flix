@@ -38,7 +38,9 @@ Makefile
 Makefile.in
 stamp-*
 vlc
+vlcflix
 vlc.exe
+vlcflix.exe
 qvlc
 rvlc
 svlc

@@ -21,16 +21,20 @@ vlc_preparser_SOURCES = \
 		preparser/cmdline.h \
 		preparser/main.c
 
-vlc_preparser_CFLAGS = $(vlc_CFLAGS)
+# flix: these follow the main program, which is vlcflix now (see ../Makefile.am).
+# They are not renamed themselves - the preparser is still vlc-preparser - but the
+# variables they read have to be the renamed ones or they silently expand to nothing
+# and the preparser stops linking against libvlc.
+vlc_preparser_CFLAGS = $(vlcflix_CFLAGS)
 
 vlc_preparser_LDADD = \
 		../compat/libcompat.la \
 		$(SOCKET_LIBS) \
-		$(vlc_LDADD)
+		$(vlcflix_LDADD)
 
-vlc_preparser_LDFLAGS = $(vlc_LDFLAGS)
+vlc_preparser_LDFLAGS = $(vlcflix_LDFLAGS)
 vlc_preparser_DEPENDENCIES = \
-		$(vlc_DEPENDENCIES)
+		$(vlcflix_DEPENDENCIES)
 
 if HAVE_OSX
 vlc_preparser_LDFLAGS += -Wl,-framework,CoreFoundation,-framework,Cocoa

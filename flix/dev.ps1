@@ -1,9 +1,10 @@
 # Fast edit loop: incremental rebuild, then replace ONLY the Qt plugin and libvlccore in D:\vlc-fork\run.
 # (The build is unstripped; the Qt plugin is ~1.3 GB, so we strip both while copying out.)
 #   ./flix/dev.ps1            rebuild + install plugin and core
-#   ./flix/dev.ps1 -Launch    ...and start VLC in portable mode (-I qt)
+#   ./flix/dev.ps1 -Launch    ...and start VLCFlix in portable mode (-I qt)
 #   ./flix/dev.ps1 -ResetLayout   forget the saved control bar layout (needed after changing the default layout)
-param([switch]$Launch, [switch]$ResetLayout, [int]$Jobs = 2, [string]$Media = "")
+#   ./flix/dev.ps1 -NoMigrate     do not carry the old portable\vlc settings over
+param([switch]$Launch, [switch]$ResetLayout, [switch]$NoMigrate, [int]$Jobs = 2, [string]$Media = "")
 $ErrorActionPreference = "Stop"
 
 $image = "registry.videolan.org/vlc-debian-win64-posix:20260611225331"
@@ -11,29 +12,48 @@ $src   = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $root  = Split-Path $src -Parent
 $run   = Join-Path $root "run"
 
+# The program was renamed to vlcflix, so its settings folder moved with it:
+# run\portable\vlc -> run\portable\VLCFlix, and vlc-qt-interface.ini ->
+# vlcflix-qt-interface.ini. Carry the old one across once, so the first run after the
+# rename still has the settings, the media library and the resume points in it. Only
+# fires when the new folder is not there yet, so it cannot overwrite anything later.
+if (-not $NoMigrate) {
+    $oldDir = Join-Path $run "portable\vlc"
+    $newDir = Join-Path $run "portable\VLCFlix"
+    if ((Test-Path $oldDir) -and -not (Test-Path $newDir)) {
+        New-Item -ItemType Directory -Force (Split-Path $newDir) | Out-Null
+        Copy-Item $oldDir $newDir -Recurse -Force
+        $oldIni = Join-Path $newDir "vlc-qt-interface.ini"
+        if (Test-Path $oldIni) {
+            Rename-Item $oldIni "vlcflix-qt-interface.ini" -Force
+        }
+        Write-Host "carried the old portable settings over to portable\VLCFlix"
+    }
+}
+
 # Close any previous instance from the run tree (a stale window would otherwise be mistaken
 # for the new build, and it keeps the old plugin DLL open).
-# Every vlc.exe is closed, not only the ones with a window: an instance that lost the race for
+# Every vlcflix.exe is closed, not only the ones with a window: an instance that lost the race for
 # the media library blocks in libvlc init, before Qt exists, and has no window at all. Skipping
 # those is how they pile up, and one of them holding ml.lock leaves every later launch without
 # a media library.
-Get-Process vlc -ErrorAction SilentlyContinue | ForEach-Object { $_.CloseMainWindow() | Out-Null }
+Get-Process vlcflix -ErrorAction SilentlyContinue | ForEach-Object { $_.CloseMainWindow() | Out-Null }
 Start-Sleep -Seconds 3
-Get-Process vlc -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process vlcflix -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
 # Stop-Process and taskkill both report "no running instance" and leave the process in place
-# for some vlc.exe that are stuck before Qt starts up; WMI still terminates them. Without this
-# the leftovers survive every build, and the next VLC to start finds the media library locked.
+# for some vlcflix.exe that are stuck before Qt starts up; WMI still terminates them. Without this
+# the leftovers survive every build, and the next VLCFlix to start finds the media library locked.
 Start-Sleep -Seconds 2
-Get-CimInstance Win32_Process -Filter "Name='vlc.exe'" -ErrorAction SilentlyContinue |
+Get-CimInstance Win32_Process -Filter "Name='vlcflix.exe'" -ErrorAction SilentlyContinue |
     ForEach-Object { try { Invoke-CimMethod -InputObject $_ -MethodName Terminate | Out-Null } catch {} }
 Start-Sleep -Seconds 1
-$left = @(Get-Process vlc -ErrorAction SilentlyContinue)
-if ($left.Count -gt 0) { Write-Host "warning: $($left.Count) vlc.exe could not be stopped; close them before testing" }
+$left = @(Get-Process vlcflix -ErrorAction SilentlyContinue)
+if ($left.Count -gt 0) { Write-Host "warning: $($left.Count) vlcflix.exe could not be stopped; close them before testing" }
 
 # The control bar layout is saved in the portable settings and then wins over the defaults in the code.
 if ($ResetLayout) {
-    $ini = Join-Path $run ("portable" + [IO.Path]::DirectorySeparatorChar + "vlc" + [IO.Path]::DirectorySeparatorChar + "vlc-qt-interface.ini")
+    $ini = Join-Path $run ("portable" + [IO.Path]::DirectorySeparatorChar + "VLCFlix" + [IO.Path]::DirectorySeparatorChar + "vlcflix-qt-interface.ini")
     if (Test-Path $ini) {
         $keep = New-Object System.Collections.Generic.List[string]
         $skip = $false
@@ -51,15 +71,48 @@ set -e
 git config --global --add safe.directory /vlc
 cd /build/win64
 make -j$Jobs
-make -C modules/gui/qt install-pluginLTLIBRARIES >/dev/null 2>&1 || make install >/dev/null
-P=`$(find _win32/lib/vlc/plugins/gui -name libqt_plugin.dll | head -1)
-echo "plugin: `$P"
+
+P=modules/gui/qt/.libs/libqt_plugin.dll
+[ -f "`$P" ] || P=`$(find . -name libqt_plugin.dll -not -path "./vlc-*" -not -path "./_win32/*" | head -1)
+[ -n "`$P" ] || { echo "no Qt plugin was built"; exit 1; }
+LP=modules/.libs/liblua_plugin.dll
+[ -f "`$LP" ] || LP=`$(find . -name liblua_plugin.dll -not -path "./vlc-*" -not -path "./_win32/*" | head -1)
+[ -f "`$LP" ] || LP=`$(find . -name liblua_plugin.dll | head -1)
+[ -n "`$LP" ] || { echo "no lua plugin was built"; exit 1; }
+echo "qt: `$P"
+echo "lua: `$LP"
+# Take everything from the real build output (.libs), never from _win32/.
+# _win32/ is a snapshot that only "make install" writes, so a plain "make" leaves it
+# behind: the Qt plugin copied from there was weeks stale, which is how a change to the
+# interface could be rebuilt and still not appear.
 x86_64-w64-mingw32-strip --strip-unneeded -o /out/libqt_plugin.dll.new "`$P"
 x86_64-w64-mingw32-strip --strip-unneeded -o /out/libvlccore.dll.new src/.libs/libvlccore.dll
-LP=`$(find . -name liblua_plugin.dll -not -path "./vlc-*" -not -path "./_win32/*" | xargs ls -t | head -1)
-echo "lua plugin: `$LP"
 x86_64-w64-mingw32-strip --strip-unneeded -o /out/liblua_plugin.dll.new "`$LP"
-ls -la /out/libqt_plugin.dll.new /out/libvlccore.dll.new /out/liblua_plugin.dll.new
+# the Windows audio output (flix fixes the 5.1 channel reorder on partial writes in wasapi)
+MM=modules/.libs/libmmdevice_plugin.dll
+[ -f "`$MM" ] || MM=`$(find . -name libmmdevice_plugin.dll -not -path "./vlc-*" -not -path "./_win32/*" | head -1)
+[ -n "`$MM" ] && x86_64-w64-mingw32-strip --strip-unneeded -o /out/libmmdevice_plugin.dll.new "`$MM"
+WA=modules/.libs/libwasapi_plugin.dll
+[ -f "`$WA" ] || WA=`$(find . -name libwasapi_plugin.dll -not -path "./vlc-*" -not -path "./_win32/*" | head -1)
+[ -n "`$WA" ] && x86_64-w64-mingw32-strip --strip-unneeded -o /out/libwasapi_plugin.dll.new "`$WA"
+
+# The exe carries the icon and the version resource, so it has to come across too.
+# The one to ship is bin/vlcflix-static.exe: the top level vlcflix is a symlink to it,
+# and that is what "make install" puts in bindir. (bin/vlcflix.exe is the small
+# uninstalled stub, and _win32/bin only gets populated by a full install, so the copy
+# there goes stale - which is how an old vlc.exe used to be picked up here.)
+# It has to land as .new: the swap below renames the destination out of the way first
+# and then moves the .new file over it. Copying straight to the final name used to work
+# by accident for a moment and then failed - every build renamed the good exe aside and
+# threw on the move that followed, so run\ kept a stale copy and a pile of .old files.
+rm -f _win32/bin/vlc.exe
+cp -f bin/vlcflix-static.exe /out/vlcflix.exe.new
+test -f _win32/bin/vlc-cache-gen.exe && cp -f _win32/bin/vlc-cache-gen.exe /out/ || true
+test -f bin/vlc-cache-gen.exe && cp -f bin/vlc-cache-gen.exe /out/ || true
+# the installer and the desktop shortcuts read the icon out of the run tree.
+# Absolute: the shell is sitting in /build/win64 at this point.
+cp -f /vlc/share/icons/vlc.ico /out/vlc.ico
+ls -la /out/libqt_plugin.dll.new /out/libvlccore.dll.new /out/liblua_plugin.dll.new /out/vlcflix.exe.new
 "@ -replace "`r", ""
 
 docker run --rm -v "${src}:/vlc" -v "vlcbuild:/build" -v "${run}:/out" $image bash -c $script
@@ -76,7 +129,31 @@ function Install-Built([string]$New, [string]$Dst) {
 }
 Install-Built (Join-Path $run "libqt_plugin.dll.new") (Join-Path $run "plugins\gui\libqt_plugin.dll")
 Install-Built (Join-Path $run "libvlccore.dll.new")   (Join-Path $run "libvlccore.dll")
+if (Test-Path (Join-Path $run "libwasapi_plugin.dll.new")) {
+    Install-Built (Join-Path $run "libwasapi_plugin.dll.new") (Join-Path $run ("plugins" + [IO.Path]::DirectorySeparatorChar + "audio_output" + [IO.Path]::DirectorySeparatorChar + "libwasapi_plugin.dll"))
+}
+if (Test-Path (Join-Path $run "libmmdevice_plugin.dll.new")) {
+    Install-Built (Join-Path $run "libmmdevice_plugin.dll.new") (Join-Path $run ("plugins" + [IO.Path]::DirectorySeparatorChar + "audio_output" + [IO.Path]::DirectorySeparatorChar + "libmmdevice_plugin.dll"))
+}
 Install-Built (Join-Path $run "liblua_plugin.dll.new") (Join-Path $run ("plugins" + [IO.Path]::DirectorySeparatorChar + "lua" + [IO.Path]::DirectorySeparatorChar + "liblua_plugin.dll"))
+# and the executable, which holds the window/exe icon
+if (Test-Path (Join-Path $run "vlcflix.exe.new")) {
+    try { Install-Built (Join-Path $run "vlcflix.exe.new") (Join-Path $run "vlcflix.exe") }
+    catch { Write-Warning "could not swap vlcflix.exe (is it running?): $($_.Exception.Message)" }
+}
+# the first build after the rename leaves the old binary behind, and two files with the
+# same icon in the same folder is exactly the confusion this rename was meant to end.
+# Best effort: an older instance may still be running and holding it open.
+foreach ($stale in @("vlc.exe", "vlc.exe.old.*")) {
+    Get-ChildItem $run -Filter $stale -ErrorAction SilentlyContinue | ForEach-Object {
+        try {
+            Remove-Item $_.FullName -Force -ErrorAction Stop
+            Write-Host "removed the old $($_.Name)"
+        } catch {
+            Write-Host "could not remove $($_.Name) (still running?): $($_.Exception.Message)"
+        }
+    }
+}
 
 # Lua scripts are loaded as plain source in the run tree
 foreach ($rel in @("intf/flixsubs.lua", "modules/flix_opensubtitles.lua", "modules/flix_tmdb.lua", "extensions/FlixSubs.lua")) {
@@ -103,5 +180,5 @@ if ($Launch) {
     New-Item -ItemType Directory -Force (Join-Path $run "portable") | Out-Null
     $a = @("-I", "qt", "--no-one-instance", "--no-qt-privacy-ask", "--no-qt-updates-notif")
     if ($Media) { $a += "`"$Media`"" }
-    Start-Process (Join-Path $run "vlc.exe") -ArgumentList $a -WorkingDirectory $run
+    Start-Process (Join-Path $run "vlcflix.exe") -ArgumentList $a -WorkingDirectory $run
 }

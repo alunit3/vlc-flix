@@ -81,7 +81,7 @@ void system_Configure( libvlc_int_t *p_this, int i_argc, const char *const ppsz_
         msg_Info( p_this, "one instance mode ENABLED");
 
         /* Use a named mutex to check if another instance is already running */
-        if( !( hmutex = CreateMutex( 0, TRUE, L"VLC ipc " TEXT(VERSION) ) ) )
+        if( !( hmutex = CreateMutex( 0, TRUE, L"VLCFlix ipc " TEXT(VERSION) ) ) )
         {
             /* Failed for some reason. Just ignore the option and go on as
              * normal. */
@@ -108,7 +108,7 @@ void system_Configure( libvlc_int_t *p_this, int i_argc, const char *const ppsz_
 
             /* Locate the window created by the IPC helper thread of the
              * 1st instance */
-            if( !( ipcwindow = FindWindow( 0, L"VLC ipc " TEXT(VERSION) ) ) )
+            if( !( ipcwindow = FindWindow( 0, L"VLCFlix ipc " TEXT(VERSION) ) ) )
             {
                 msg_Err( p_this, "one instance mode DISABLED "
                          "(couldn't find 1st instance of program)" );

@@ -36,11 +36,12 @@ if build_vlc and (host_system != 'darwin' or have_osx) and not have_win_store an
                 vlc_src_root / 'share/icons',
                 vlc_src_root / 'extras/package/win32',
             ],
-            depend_files: files('../extras/package/win32/vlc.exe.manifest'),
+            depend_files: files('../extras/package/win32/vlcflix.exe.manifest',
+                             '../share/icons/vlc.ico'),
         )
     endif
 
-    executable('vlc',
+    executable('vlcflix',
         vlc_sources + vlc_win_extra,
         link_with: [libvlc, libvlccore],
         include_directories: [vlc_include_dirs],
@@ -53,7 +54,7 @@ if build_vlc and (host_system != 'darwin' or have_osx) and not have_win_store an
     vlc_top_builddir_def = '-DTOP_BUILDDIR="@0@"'.format(vlc_build_root)
     vlc_top_srcdir_def = '-DTOP_SRCDIR="@0@"'.format(vlc_src_root)
 
-    executable('vlc-static',
+    executable('vlcflix-static',
         vlc_sources,
         link_with: [libvlc, libvlccore],
         include_directories: [vlc_include_dirs],

@@ -240,16 +240,19 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
      * returns control to the application (DESIGN BUG!), all these variables
      * must be created (in place of libvlc_new()) and set to VLC defaults
      * (in place of VLC main()) *here*. */
+    /* flix: keep these in step with bin/winvlc.c, which sets the same identity on the
+     * Windows front end. A second install of a stock VLC and this one otherwise share
+     * a taskbar group, an icon and an app id. */
     var_Create( p_libvlc, "user-agent", VLC_VAR_STRING );
     var_SetString( p_libvlc, "user-agent",
-                   "VLC media player (LibVLC "VERSION")" );
+                   "VLCFlix (LibVLC "VERSION")" );
     var_Create( p_libvlc, "http-user-agent", VLC_VAR_STRING );
     var_SetString( p_libvlc, "http-user-agent",
-                   "VLC/"PACKAGE_VERSION" LibVLC/"PACKAGE_VERSION );
+                   "VLCFlix/"PACKAGE_VERSION" LibVLC/"PACKAGE_VERSION );
     var_Create( p_libvlc, "app-icon-name", VLC_VAR_STRING );
     var_SetString( p_libvlc, "app-icon-name", PACKAGE_NAME );
     var_Create( p_libvlc, "app-id", VLC_VAR_STRING );
-    var_SetString( p_libvlc, "app-id", "org.VideoLAN.VLC" );
+    var_SetString( p_libvlc, "app-id", "org.VLCFlix.VLCFlix" );
     var_Create( p_libvlc, "app-version", VLC_VAR_STRING );
     var_SetString( p_libvlc, "app-version", PACKAGE_VERSION );
 

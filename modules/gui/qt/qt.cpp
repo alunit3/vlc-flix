@@ -972,8 +972,8 @@ static void *Thread( void *obj )
     {
         QString configDir = cConfigDir;
         free( cConfigDir );
-        if( configDir.endsWith( "\\vlc" ) )
-            configDir.chop( 4 ); /* the "\vlc" dir is added again by QSettings */
+        if( configDir.endsWith( "\\VLCFlix" ) )
+            configDir.chop( 8 ); /* the "\VLCFlix" dir is added again by QSettings */
         QSettings::setPath( QSettings::IniFormat, QSettings::UserScope, configDir );
     }
 #endif
@@ -984,7 +984,7 @@ static void *Thread( void *obj )
 #else
             QSettings::NativeFormat,
 #endif
-            QSettings::UserScope, "vlc", "vlc-qt-interface" );
+            QSettings::UserScope, "VLCFlix", "vlcflix-qt-interface" );
 
     // It is guaranteed that the returned format is supported, if a format is returned.
     static const auto createCompatibleOpenGLFormat = []() -> std::optional<QSurfaceFormat> {
@@ -1271,7 +1271,7 @@ static void *Thread( void *obj )
     }
 #endif
 
-    app.setApplicationDisplayName( qtr("VLC media player") );
+    app.setApplicationDisplayName( qtr("VLCFlix") );
     app.setApplicationVersion( QString::fromUtf8(VERSION_MESSAGE) );
 
     if( QDate::currentDate().dayOfYear() >= QT_XMAS_JOKE_DAY && var_InheritBool( p_intf, "qt-icon-change" ) )

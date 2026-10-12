@@ -15,13 +15,13 @@ BEGIN
   BEGIN
     BLOCK "040904E4"
     BEGIN
-      VALUE "CompanyName", "VideoLAN"
-      VALUE "ProductName", "VLC media player"
+      VALUE "CompanyName", "VLCFlix"
+      VALUE "ProductName", "VLCFlix"
       VALUE "ProductVersion", VERSION_NUMBER_STR
-      VALUE "InternalName", "vlc"
-      VALUE "OriginalFilename", "vlc.exe"
+      VALUE "InternalName", "vlcflix"
+      VALUE "OriginalFilename", "vlcflix.exe"
       VALUE "FileVersion", "@VERSION@"
-      VALUE "FileDescription", "VLC media player"
+      VALUE "FileDescription", "VLCFlix"
       VALUE "LegalCopyright", "Copyright \251 @COPYRIGHT_YEARS@ VideoLAN and VLC Authors"
       VALUE "LegalTrademarks", "VLC media player, VideoLAN and x264 are registered trademarks from VideoLAN"
     END
@@ -32,4 +32,4 @@ BEGIN
   END
 END
 
-CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "vlc.exe.manifest"
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "vlcflix.exe.manifest"

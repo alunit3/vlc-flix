@@ -134,10 +134,10 @@ FunctionEnd
   WriteRegDWORD HKLM "Software\Clients\Media\VLC\InstallInfo" "IconsVisible" 1
   SetShellVarContext all  ; Set $DESKTOP to All Users
   ${Unless} ${FileExists} "$DESKTOP\VLC media player.lnk"
-    CreateShortCut "$DESKTOP\VLC media player.lnk" "$EXEDIR\vlc.exe" "" "$EXEDIR\vlc.exe" 0
+    CreateShortCut "$DESKTOP\VLC media player.lnk" "$EXEDIR\vlcflix.exe" "" "$EXEDIR\vlcflix.exe" 0
   ${EndUnless}
   ${Unless} ${FileExists} "$QUICKLAUNCH\VLC media player.lnk"
-    CreateShortCut "$QUICKLAUNCH\VLC media player.lnk" "$EXEDIR\vlc.exe" "" "$EXEDIR\vlc.exe" 0
+    CreateShortCut "$QUICKLAUNCH\VLC media player.lnk" "$EXEDIR\vlcflix.exe" "" "$EXEDIR\vlcflix.exe" 0
   ${EndUnless}
 !macroend
 !define ShowIcons "!insertmacro ShowIcons"

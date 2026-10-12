@@ -142,7 +142,7 @@ static void *HelperThread(void *data)
 
     HWND ipcwindow =
         CreateWindow(L"STATIC",                      /* name of window class */
-                  L"VLC ipc " TEXT(VERSION),        /* window title bar text */
+                  L"VLCFlix ipc " TEXT(VERSION),   /* window title bar text */
                   0,                                         /* window style */
                   0,                                 /* default X coordinate */
                   0,                                 /* default Y coordinate */

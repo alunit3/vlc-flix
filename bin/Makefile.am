@@ -5,8 +5,8 @@ if HAVE_OSX
 bin_PROGRAMS = vlc-osx
 noinst_PROGRAMS = vlc-osx-static
 else
-bin_PROGRAMS = vlc
-noinst_PROGRAMS = vlc-static
+bin_PROGRAMS = vlcflix
+noinst_PROGRAMS = vlcflix-static
 endif
 endif
 EXTRA_DIST = vlc_win32_rc.rc.in
@@ -27,25 +27,30 @@ endif
 #
 # Main VLC executable
 #
-vlc_LDADD = ../lib/libvlc.la ../src/libvlccore.la
-vlc_CPPFLAGS = $(AM_CPPFLAGS)
+# flix: the program is vlcflix, not vlc. Automake keys every per-target variable on
+# the program name, so each of these has to be renamed together with line 8 - leave one
+# behind and it is silently ignored, which builds a binary with no sources, no icon
+# and no -mwindows (so a console window instead of the app).
+#
+vlcflix_LDADD = ../lib/libvlc.la ../src/libvlccore.la
+vlcflix_CPPFLAGS = $(AM_CPPFLAGS)
 if !HAVE_WIN32
-vlc_SOURCES = vlc.c override.c
-vlc_LDADD += $(LIBDL)
+vlcflix_SOURCES = vlc.c override.c
+vlcflix_LDADD += $(LIBDL)
 else
-vlc_SOURCES = winvlc.c
-EXTRA_vlc_DEPENDENCIES = vlc_win32_rc.$(OBJEXT)
-vlc_LDFLAGS = -mwindows -Wc,-static
-vlc_LDADD += -lole32 vlc_win32_rc.$(OBJEXT)
+vlcflix_SOURCES = winvlc.c
+EXTRA_vlcflix_DEPENDENCIES = vlc_win32_rc.$(OBJEXT)
+vlcflix_LDFLAGS = -mwindows -Wc,-static
+vlcflix_LDADD += -lole32 vlc_win32_rc.$(OBJEXT)
 libbreakpad_wrapper_la_SOURCES = breakpad.cpp
 libbreakpad_wrapper_la_LIBADD = $(BREAKPAD_LIBS)
 libbreakpad_wrapper_la_LDFLAGS = -static
 libbreakpad_wrapper_la_CXXFLAGS = $(AM_CXXFLAGS) $(BREAKPAD_CFLAGS) -DBREAKPAD_URL=\"@BREAKPAD_URL@\"
 if HAVE_BREAKPAD
 noinst_LTLIBRARIES += libbreakpad_wrapper.la
-vlc_LDADD += libbreakpad_wrapper.la -lstdc++ -lwininet
-EXTRA_vlc_DEPENDENCIES += libbreakpad_wrapper.la
-vlc_CPPFLAGS += -DHAVE_BREAKPAD
+vlcflix_LDADD += libbreakpad_wrapper.la -lstdc++ -lwininet
+EXTRA_vlcflix_DEPENDENCIES += libbreakpad_wrapper.la
+vlcflix_CPPFLAGS += -DHAVE_BREAKPAD
 endif
 endif
 
@@ -80,15 +85,15 @@ endif
 #
 # Static (debug) VLC executable
 #
-vlc_static_SOURCES = $(vlc_SOURCES)
-vlc_static_CFLAGS = $(AM_CFLAGS) \
+vlcflix_static_SOURCES = $(vlcflix_SOURCES)
+vlcflix_static_CFLAGS = $(AM_CFLAGS) \
 	-DTOP_BUILDDIR=\"$(abs_top_builddir)\" \
 	-DTOP_SRCDIR=\"$(abs_top_srcdir)\" \
 	$(NULL)
-vlc_static_CPPFLAGS = $(vlc_CPPFLAGS)
-EXTRA_vlc_static_DEPENDENCIES = $(EXTRA_vlc_DEPENDENCIES)
-vlc_static_LDADD = $(vlc_LDADD)
-vlc_static_LDFLAGS = $(vlc_LDFLAGS) -no-install -static
+vlcflix_static_CPPFLAGS = $(vlcflix_CPPFLAGS)
+EXTRA_vlcflix_static_DEPENDENCIES = $(EXTRA_vlcflix_DEPENDENCIES)
+vlcflix_static_LDADD = $(vlcflix_LDADD)
+vlcflix_static_LDFLAGS = $(vlcflix_LDFLAGS) -no-install -static
 
 #
 # Root wrapper
@@ -107,7 +112,10 @@ vlc_win32_rc.rc: $(top_builddir)/config.status vlc_win32_rc.rc.in
 	cd "$(top_builddir)" && \
 	$(SHELL) ./config.status --file="bin/$@"
 
-vlc_win32_rc.$(OBJEXT): vlc_win32_rc.rc $(top_srcdir)/extras/package/win32/vlc.exe.manifest
+# the resource script embeds share/icons/vlc.ico (VLC_ICON in vlc_win32_rc.rc.in), so
+# windres has to run again when that file changes - otherwise a new icon is ignored
+# and the exe keeps the old one
+vlc_win32_rc.$(OBJEXT): vlc_win32_rc.rc $(top_srcdir)/extras/package/win32/vlcflix.exe.manifest $(top_srcdir)/share/icons/vlc.ico
 	$(WINDRES) --include-dir $(top_srcdir)/share/icons --include-dir $(top_srcdir)/extras/package/win32 -i $< -o $@
 
 #
@@ -130,10 +138,10 @@ endif
 if HAVE_PARTIAL_LINKING
 AM_CPPFLAGS += -DVLC_PARTIAL_LINKING -I $(builddir)/../modules/
 if !HAVE_WIN32
-vlc_SOURCES += vlc_static_modules.c
+vlcflix_SOURCES += vlc_static_modules.c
 endif
 vlc_osx_SOURCES += vlc_static_modules.c
-vlc_LDADD += ../modules/libvlc_static_modules.la
+vlcflix_LDADD += ../modules/libvlc_static_modules.la
 vlc_osx_LDADD += ../modules/libvlc_static_modules.la
 endif
 
@@ -148,7 +156,7 @@ MOSTLYCLEANFILES = $(noinst_DATA)
 if HAVE_OSX
 if BUILD_VLC
 install-data-local:
-	cd "$(DESTDIR)$(bindir)"; mv vlc-osx vlc
+	cd "$(DESTDIR)$(bindir)"; mv vlc-osx vlcflix
 
 endif
 endif

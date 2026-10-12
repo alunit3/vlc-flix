@@ -168,11 +168,11 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
         else
         {
             const size_t pathlen = wcslen( copath );
-            wchar_t *path = malloc( ( pathlen + wcslen(L"\\vlc\\crashdump") + 1 ) * sizeof(*path) );
+            wchar_t *path = malloc( ( pathlen + wcslen(L"\\VLCFlix\\crashdump") + 1 ) * sizeof(*path) );
             if ( path != NULL)
             {
                 memcpy( path, copath, pathlen * sizeof(*path) );
-                memcpy( &path[pathlen], L"\\vlc\\crashdump", (wcslen(L"\\vlc\\crashdump") + 1)  * sizeof(*path) );
+                memcpy( &path[pathlen], L"\\VLCFlix\\crashdump", (wcslen(L"\\VLCFlix\\crashdump") + 1)  * sizeof(*path) );
                 CheckCrashDump( path );
                 eh = InstallCrashHandler( path );
                 free( path );
@@ -190,7 +190,7 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
     if (!lang)
     {
         HKEY h_key;
-        if( RegOpenKeyEx( HKEY_CURRENT_USER, TEXT("Software\\VideoLAN\\VLC\\"), 0, KEY_READ, &h_key )
+        if( RegOpenKeyEx( HKEY_CURRENT_USER, TEXT("Software\\VLCFlix\\VLCFlix\\"), 0, KEY_READ, &h_key )
                 == ERROR_SUCCESS )
         {
             WCHAR szData[256];
@@ -216,9 +216,13 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
         HANDLE sem = CreateSemaphore(NULL, 0, 1, NULL);
 
         libvlc_SetExitHandler(vlc->p_libvlc_int, vlc_kill, &sem);
-        libvlc_set_app_id (vlc, "org.VideoLAN.VLC", PACKAGE_VERSION,
+        /* flix: this is the program's identity as far as Windows is concerned - the
+         * taskbar grouping, the AppUserModelID and the icon the shell picks up when
+         * it has no better source. Leaving it as org.VideoLAN.VLC is why a second
+         * install and the stock player shared a taskbar icon and a group. */
+        libvlc_set_app_id (vlc, "org.VLCFlix.VLCFlix", PACKAGE_VERSION,
                            PACKAGE_NAME);
-        libvlc_set_user_agent (vlc, "VLC media player", "VLC/"PACKAGE_VERSION);
+        libvlc_set_user_agent (vlc, "VLCFlix", "VLCFlix/"PACKAGE_VERSION);
         libvlc_InternalAddIntf (vlc->p_libvlc_int, NULL);
         libvlc_InternalPlay (vlc->p_libvlc_int);
 
@@ -228,9 +232,9 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
         libvlc_release (vlc);
     }
     else
-        MessageBox (NULL, TEXT("VLC media player could not start.\n"
+        MessageBox (NULL, TEXT("VLCFlix could not start.\n"
                     "Either the command line options were invalid or no plugins were found.\n"),
-                    TEXT("VLC media player"),
+                    TEXT("VLCFlix"),
                     MB_OK|MB_ICONERROR);
 
 

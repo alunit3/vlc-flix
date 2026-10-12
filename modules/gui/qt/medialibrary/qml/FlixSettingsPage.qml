@@ -43,6 +43,7 @@ Item {
     property string metaLang: "en-US"
     property string top10: "torrents"
     property bool subsAuto: true
+    property bool updateCheck: true
     property bool subsAsk: true
     property string subsLangs: ""
     property string defaultProvider: "VidStuck"
@@ -85,6 +86,7 @@ Item {
         metaLang = MainCtx.vlcOption("flix-meta-language") || "en-US"
         top10 = MainCtx.vlcOption("flix-top10-target") || "torrents"
         subsAuto = MainCtx.vlcOption("flixsubs-auto") !== false
+        updateCheck = MainCtx.vlcOption("flix-update-check") !== false
         subsAsk = MainCtx.vlcOption("flixsubs-ask") !== false
         subsLangs = MainCtx.vlcOption("flixsubs-languages") || ""
         defaultProvider = String(MainCtx.flixPref("web/default", "VidStuck"))
@@ -1220,6 +1222,12 @@ Item {
                 current: root.section === "about"
 
                 Heading { text: qsTr("About VLCFlix") }
+                Toggle {
+                    label: qsTr("Check for updates")
+                    hint: qsTr("Once a day, ask the VLCFlix releases on GitHub whether a newer version is out, and say so on the Home page.")
+                    checked: root.updateCheck
+                    onToggled: (value) => { root.updateCheck = value; MainCtx.setVlcOption("flix-update-check", value) }
+                }
                 Note { text: qsTr("VLCFlix is a personal front end built on VLC (VideoLAN, GPL). It is not affiliated with Netflix.") }
                 Note { text: qsTr("Movie information and images: this product uses the TMDB API but is not endorsed or certified by TMDB.") }
                 Note { text: qsTr("Subtitles: OpenSubtitles.com. Torrent streaming: anacrolix/torrent (MPL-2.0). Online players: Microsoft Edge WebView2.") }

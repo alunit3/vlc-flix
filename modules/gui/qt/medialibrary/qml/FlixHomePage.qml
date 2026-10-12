@@ -101,7 +101,10 @@ Widgets.PageExt {
         }
     }
 
-    Component.onCompleted: _refreshHero()
+    Component.onCompleted: {
+        _refreshHero()
+        _refreshUpdate()
+    }
 
     Connections {
         target: MainCtx
@@ -129,6 +132,19 @@ Widgets.PageExt {
     // flix: adding a folder used to fail silently - the model reports it through
     // operationFailed and nothing here listened, so picking a folder that the library
     // refused just did nothing and looked broken
+    // a newer VLCFlix release ({version, url}, from the Lua service), unless that version was
+    // waved away with "Not now"
+    // ("update" would collide with Item.update())
+    property var flixUpdate: ({})
+    function _refreshUpdate() {
+        const info = MainCtx.updateInfo()
+        root.flixUpdate = (info.version && String(MainCtx.flixPref("update/skipped", "")) !== info.version) ? info : ({})
+    }
+    Connections {
+        target: MainCtx
+        function onUpdateChanged() { root._refreshUpdate() }
+    }
+
     property string folderError: ""
     property string folderErrorUrl: ""
 
@@ -248,7 +264,7 @@ Widgets.PageExt {
         if (rows.length > 0)
             _focusRow(rows[0], reason)
         else
-            emptyState.forceActiveFocus(reason)
+            root.forceActiveFocus(reason)
     }
 
     Rectangle {
@@ -367,6 +383,58 @@ Widgets.PageExt {
                 }
             }
 
+            // "VLCFlix 1.1.0 is available"
+            Rectangle {
+                visible: root.flixUpdate.version !== undefined
+                width: column.width - 2 * root.sideMargin
+                height: updateRow.implicitHeight + 2 * VLCStyle.dp(12, VLCStyle.scale)
+                x: root.sideMargin
+                radius: VLCStyle.dp(8, VLCStyle.scale)
+                color: Qt.rgba(1, 1, 1, 0.06)
+                border.color: Qt.rgba(1, 1, 1, 0.12)
+
+                Row {
+                    id: updateRow
+
+                    anchors.centerIn: parent
+                    spacing: VLCStyle.dp(20, VLCStyle.scale)
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: qsTr("VLCFlix %1 is available").arg(root.flixUpdate.version ?? "")
+                        color: "#F2F2F2"
+                        font.pixelSize: VLCStyle.dp(14, VLCStyle.scale)
+                        font.weight: Font.DemiBold
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: qsTr("Download")
+                        color: downloadHover.hovered ? "#FFFFFF" : "#E50914"
+                        font.pixelSize: VLCStyle.dp(14, VLCStyle.scale)
+                        font.weight: Font.Bold
+
+                        HoverHandler { id: downloadHover; cursorShape: Qt.PointingHandCursor }
+                        TapHandler { onTapped: Qt.openUrlExternally(root.flixUpdate.url) }
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: qsTr("Not now")
+                        color: skipHover.hovered ? "#FFFFFF" : "#B3B3B3"
+                        font.pixelSize: VLCStyle.dp(14, VLCStyle.scale)
+
+                        HoverHandler { id: skipHover; cursorShape: Qt.PointingHandCursor }
+                        TapHandler {
+                            onTapped: {
+                                MainCtx.setFlixPref("update/skipped", root.flixUpdate.version)
+                                root.flixUpdate = ({})
+                            }
+                        }
+                    }
+                }
+            }
+
             // says why a folder was refused, which used to happen in silence
             Rectangle {
                 visible: root.folderError !== ""
@@ -479,15 +547,8 @@ Widgets.PageExt {
             }
         }
 
-        // Nothing in the library yet: offer VLC's own "add a folder" / "open" buttons.
-        NoMedialibHome.ConeNButtons {
-            id: emptyState
-
-            visible: root._visibleRows().length === 0
-            orientation: Qt.Vertical
-            anchors.centerIn: parent
-
-            Navigation.parentItem: root
-        }
+        // An empty library is FlixLibraryPrompt's to explain ("Your movie library is empty",
+        // Add movie folder). VLC's own cone and Open File / Open Disc buttons used to sit here
+        // too, centred on the page, and were drawn straight over that card.
     }
 }

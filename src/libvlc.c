@@ -345,6 +345,8 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
      * the Lua service announces finished cache entries in "flix-meta-update" */
     var_Create(p_libvlc, "flix-meta-request", VLC_VAR_STRING);
     var_Create(p_libvlc, "flix-meta-update", VLC_VAR_STRING);
+    /* a newer VLCFlix release, found by the Lua service (JSON {version, url}) */
+    var_Create(p_libvlc, "flix-update", VLC_VAR_STRING);
 
     return VLC_SUCCESS;
 

@@ -683,6 +683,9 @@ public slots:
     // flix: the Lua subtitle service found subtitles and asks whether to download them
     void emitSubtitleOffer(const QString &json) { emit subtitleOffered(json); }
     void emitMetaUpdate(const QString &key) { emit metaUpdated(key); }
+    void emitUpdateChanged() { emit updateChanged(); }
+    // a newer VLCFlix release: {version, url}, empty when there is none
+    Q_INVOKABLE QVariantMap updateInfo() const;
     void emitAccountResult(const QString &json);
     /** answer an offer made through subtitleOffered(): the service downloads on accept */
     Q_INVOKABLE void answerSubtitleOffer(int fileId, bool accept);
@@ -700,6 +703,7 @@ signals:
     void subtitleOffered(const QString &json);
     /** a cache entry ("top10" or a title key) was written by flixsubs.lua */
     void metaUpdated(const QString &key);
+    void updateChanged();
     void accountTestResult(const QString &kind, bool ok, const QString &message);
     void fullscreenInterfaceToggled( bool );
     void setInterfaceVisibible(bool );

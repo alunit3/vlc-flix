@@ -126,6 +126,8 @@ static int MetaUpdateCB( vlc_object_t *p_this, const char *psz_variable,
                          vlc_value_t old_val, vlc_value_t new_val, void *param );
 static int AccountResultCB( vlc_object_t *p_this, const char *psz_variable,
                             vlc_value_t old_val, vlc_value_t new_val, void *param );
+static int UpdateCB( vlc_object_t *p_this, const char *psz_variable,
+                     vlc_value_t old_val, vlc_value_t new_val, void *param );
 
 const QEvent::Type MainCtx::ToolbarsNeedRebuild =
         (QEvent::Type)QEvent::registerEventType();
@@ -287,6 +289,7 @@ MainCtx::MainCtx(qt_intf_t *_p_intf)
     var_AddCallback( libvlc, "flix-sub-offer", SubtitleOfferCB, p_intf );
     var_AddCallback( libvlc, "flix-meta-update", MetaUpdateCB, p_intf );
     var_AddCallback( libvlc, "flix-account-result", AccountResultCB, p_intf );
+    var_AddCallback( libvlc, "flix-update", UpdateCB, p_intf );
 
     /* Register callback for the intf-popupmenu variable */
     var_AddCallback( libvlc, "intf-popupmenu", PopupMenuCB, p_intf );
@@ -402,6 +405,7 @@ MainCtx::~MainCtx()
     var_DelCallback( libvlc, "flix-sub-offer", SubtitleOfferCB, p_intf );
     var_DelCallback( libvlc, "flix-meta-update", MetaUpdateCB, p_intf );
     var_DelCallback( libvlc, "flix-account-result", AccountResultCB, p_intf );
+    var_DelCallback( libvlc, "flix-update", UpdateCB, p_intf );
     var_DelCallback( libvlc, "intf-toggle-fscontrol", IntfShowCB, p_intf );
     var_DelCallback( libvlc, "intf-popupmenu", PopupMenuCB, p_intf );
 
@@ -1261,6 +1265,7 @@ static bool flixOptionAllowed( const QString &name )
         QStringLiteral("flixsubs-api-key"), QStringLiteral("flixsubs-user"), QStringLiteral("flixsubs-password"),
         QStringLiteral("flixsubs-languages"), QStringLiteral("flixsubs-auto"), QStringLiteral("flixsubs-ask"),
         QStringLiteral("flix-tmdb-token"), QStringLiteral("flix-meta-language"), QStringLiteral("flix-top10-target"),
+        QStringLiteral("flix-update-check"),
     };
     return allowed.contains( name );
 }
@@ -2550,6 +2555,32 @@ static int MetaUpdateCB( vlc_object_t *, const char *,
         p_intf->p_mi->emitMetaUpdate( qfu( new_val.psz_string ) );
 
     return VLC_SUCCESS;
+}
+
+static int UpdateCB( vlc_object_t *, const char *,
+                     vlc_value_t, vlc_value_t, void *param )
+{
+    qt_intf_t *p_intf = (qt_intf_t *)param;
+    if( p_intf->p_mi != NULL )
+        p_intf->p_mi->emitUpdateChanged();
+    return VLC_SUCCESS;
+}
+
+// the newer release the Lua service found ({version, url}), empty when there is none. Read
+// from the variable rather than kept from the signal: the service can find it before the
+// Home page is there to listen.
+QVariantMap MainCtx::updateInfo() const
+{
+    char *text = var_GetString( vlc_object_instance(p_intf), "flix-update" );
+    if( text == nullptr )
+        return {};
+    const QVariantMap info = QJsonDocument::fromJson( QByteArray( text ) ).object().toVariantMap();
+    free( text );
+    const QUrl url( info.value( QStringLiteral("url") ).toString() );
+    // only ever send the user to this project's own releases
+    if( url.scheme() != QLatin1String("https") || url.host() != QLatin1String("github.com") )
+        return {};
+    return info;
 }
 
 static int IntfShowCB( vlc_object_t *, const char *,

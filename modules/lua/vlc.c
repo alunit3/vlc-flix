@@ -75,6 +75,8 @@
 #define FLIXMETA_URL_TEXT N_("TMDB API address")
 #define FLIXMETA_URL_LONGTEXT N_( "Only for testing against another server. Leave empty." )
 #define FLIXMETA_IMG_TEXT N_("TMDB image address")
+#define FLIXUPDATE_TEXT N_("Check for VLCFlix updates")
+#define FLIXUPDATE_LONGTEXT N_( "Once a day, ask the VLCFlix releases on GitHub whether a newer "     "version is out, and say so on the Home page." )
 #define INTF_LONGTEXT N_("Lua interface module to load")
 
 #define CONFIG_TEXT N_("Lua interface configuration")
@@ -702,6 +704,8 @@ vlc_module_begin ()
             add_string( "flix-top10-target", "torrents", FLIXMETA_TOP_TEXT, FLIXMETA_TOP_LONGTEXT )
             add_string( "flix-tmdb-base-url", "", FLIXMETA_URL_TEXT, FLIXMETA_URL_LONGTEXT )
             add_string( "flix-tmdb-image-url", "", FLIXMETA_IMG_TEXT, FLIXMETA_URL_LONGTEXT )
+        set_section( N_("Updates"), NULL )
+            add_bool( "flix-update-check", true, FLIXUPDATE_TEXT, FLIXUPDATE_LONGTEXT )
 
         set_section( N_( "Socks proxy") , NULL )
         add_string( "socks", NULL,

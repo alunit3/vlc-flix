@@ -376,6 +376,79 @@ local function account_step()
     vlc.var.set(libvlc, "flix-account-result", json.encode(result))
 end
 
+------------------------------------------------------------------------------
+-- updates
+------------------------------------------------------------------------------
+-- Asks this project's GitHub releases whether a newer VLCFlix is out, at most once a day,
+-- and tells the interface in "flix-update" (JSON {version, url}). VLC's own update check is
+-- not built: it asks VideoLAN, which only knows stock VLC.
+
+local UPDATE_URL = "https://api.github.com/repos/alunit3/vlc-flix/releases/latest"
+local update_due = vlc.misc.mdate() + 20000000      -- a little after start-up, once per run
+
+local function semver(s)
+    local a, b, c = tostring(s or ""):match("(%d+)%.(%d+)%.(%d+)")
+    if not a then return nil end
+    return { tonumber(a), tonumber(b), tonumber(c) }
+end
+
+local function is_newer(a, b)
+    for i = 1, 3 do
+        if a[i] ~= b[i] then return a[i] > b[i] end
+    end
+    return false
+end
+
+local function update_file()
+    return vlc.config.userdatadir() .. "/flix-update.json"
+end
+
+local function update_step()
+    if not update_due or vlc.misc.mdate() < update_due then return end
+    update_due = nil
+    if not flag("flix-update-check", true) then return end
+    local current = semver(vlc.misc.version())       -- "1.0.0 (VLC 4.0.0-dev ...)"
+    if not current then return end
+
+    -- the last answer is kept, so the notice comes back on every start until updated
+    local saved = {}
+    local file = vlc.io.open(update_file(), "rb")
+    if file then
+        local text = file:read("*a")
+        file:close()
+        saved = text and json.decode(text) or {}
+        if type(saved) ~= "table" then saved = {} end
+    end
+
+    local now = os.time()
+    if not tonumber(saved.checked) or now - tonumber(saved.checked) > 86400 then
+        local status, body = vlc.http.get(UPDATE_URL, { Accept = "application/vnd.github+json" })
+        if status == 200 and body then
+            local release = json.decode(body)
+            if type(release) == "table" and type(release.tag_name) == "string" then
+                saved = { checked = now, version = release.tag_name:gsub("^v", ""),
+                          url = release.html_url }
+            end
+        elseif status then
+            -- 404: no published release (or the repository is not public); not an error
+            saved = { checked = now }
+        else
+            return                                     -- offline: try again next start
+        end
+        local out = vlc.io.open(update_file(), "wb")
+        if out then
+            out:write(json.encode(saved))
+            out:close()
+        end
+    end
+
+    local latest = semver(saved.version)
+    if latest and is_newer(latest, current) and type(saved.url) == "string" then
+        log("VLCFlix " .. saved.version .. " is available")
+        vlc.var.set(libvlc, "flix-update", json.encode({ version = saved.version, url = saved.url }))
+    end
+end
+
 -- The subtitle chosen last time goes back on as soon as a film is playing. This runs first
 -- in every tick: the metadata queue below can hold the loop for a long while at start-up
 -- (the Home page asks for every poster at once), and a restore waiting behind it showed up
@@ -392,6 +465,8 @@ end
 
 local function step()
     restore_step()
+    local ok, err = pcall(update_step)
+    if not ok then vlc.msg.warn("[flixsubs] update check failed: " .. tostring(err)) end
     pcall(meta_step)
     pcall(account_step)
     -- the interface answered a subtitle offer

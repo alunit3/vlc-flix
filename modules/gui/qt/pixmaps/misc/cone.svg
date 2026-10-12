@@ -1,4 +1,408 @@
-<svg viewBox="0 0 130 130" xmlns="http://www.w3.org/2000/svg">
-  <path d="M65 8.76c-1.511 0-3.023.369-4.219 1.108-2.675 1.654-4.219 8.438-4.219 8.438L54.031 25.9c7.312 4.599 14.625 4.647 21.938 0l-2.532-7.594s-1.543-6.784-4.218-8.438C68.022 9.129 66.511 8.761 65 8.761zM47.281 46.15l-8.437 25.312c17.304 11.16 34.739 11.376 52.312 0L82.72 46.15c-11.912 8.86-23.725 8.888-35.438 0zM22.812 81.587 11 121.243h108l-11.813-39.656H94.531l1.688 5.063s1.401 4.523 0 5.906c-14.817 14.618-47.82 13.973-62.438-.844-1.185-1.201 0-5.062 0-5.062l1.688-5.063z" fill="#FF8800"/>
-  <path d="m35.469 81.585-1.688 5.063s-1.185 3.86 0 5.062c14.618 14.817 47.62 15.462 62.438.844 1.401-1.383 0-5.906 0-5.906l-1.688-5.063-3.375-10.125c-17.573 11.376-35.008 11.159-52.312 0zm11.812-35.437c11.713 8.888 23.526 8.86 35.438 0l-6.75-20.25c-7.313 4.647-14.625 4.599-21.938 0z" fill="#FFFFFF"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 620">
+  <defs>
+    <!--
+      Rendered by Qt's QtSvg module, which implements SVG Tiny 1.2: <filter> is not
+      supported, so the soft shadows below are radial gradients fading to transparent
+      instead of blurred ellipses, and the highlight strokes carry no blur.
+    -->
+    <radialGradient id="shadowWide" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.30" />
+      <stop offset="55%" stop-color="#000000" stop-opacity="0.13" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="shadowTight" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.42" />
+      <stop offset="70%" stop-color="#000000" stop-opacity="0.10" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="shadowOnPlinth" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#240106" stop-opacity="0.60" />
+      <stop offset="65%" stop-color="#240106" stop-opacity="0.22" />
+      <stop offset="100%" stop-color="#240106" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Metallic Red Cone Main Gradient -->
+    <linearGradient id="coneRedGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#360107" />
+      <stop offset="6%" stop-color="#5e0510" />
+      <stop offset="14%" stop-color="#960d21" />
+      <stop offset="22%" stop-color="#b8142c" />
+      <stop offset="30%" stop-color="#730514" />
+      <stop offset="42%" stop-color="#4a020a" />
+      <stop offset="52%" stop-color="#6e0615" />
+      <stop offset="62%" stop-color="#a60e24" />
+      <stop offset="70%" stop-color="#da1e3b" />
+      <stop offset="75%" stop-color="#ff6b84" />
+      <stop offset="79%" stop-color="#ea2846" />
+      <stop offset="87%" stop-color="#990b1e" />
+      <stop offset="95%" stop-color="#57030e" />
+      <stop offset="100%" stop-color="#330106" />
+    </linearGradient>
+
+    <!-- Top Cap Dome Highlight -->
+    <radialGradient id="domeHotspot" cx="68%" cy="32%" r="45%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
+      <stop offset="22%" stop-color="#ff94a6" stop-opacity="0.8" />
+      <stop offset="48%" stop-color="#d91a38" stop-opacity="0.4" />
+      <stop offset="85%" stop-color="#80081a" stop-opacity="0" />
+      <stop offset="100%" stop-color="#300106" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Vertical Specular Sheen (Candy Coat Reflection) -->
+    <linearGradient id="specularStreak" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0" />
+      <stop offset="35%" stop-color="#ff99ab" stop-opacity="0.15" />
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.85" />
+      <stop offset="65%" stop-color="#ff8097" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Filmstrip Smoked Acrylic Base Gradient -->
+    <linearGradient id="filmBaseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#140b0f" />
+      <stop offset="12%" stop-color="#24141c" />
+      <stop offset="24%" stop-color="#331824" />
+      <stop offset="36%" stop-color="#1f0f16" />
+      <stop offset="48%" stop-color="#13090e" />
+      <stop offset="60%" stop-color="#220e17" />
+      <stop offset="70%" stop-color="#3d1523" />
+      <stop offset="76%" stop-color="#5a1d2f" />
+      <stop offset="80%" stop-color="#78243b" />
+      <stop offset="86%" stop-color="#421422" />
+      <stop offset="94%" stop-color="#200c14" />
+      <stop offset="100%" stop-color="#12080d" />
+    </linearGradient>
+
+    <!-- Filmstrip Gloss Sheen -->
+    <linearGradient id="filmGlossGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0" />
+      <stop offset="66%" stop-color="#ffffff" stop-opacity="0.02" />
+      <stop offset="74%" stop-color="#ffb3c2" stop-opacity="0.25" />
+      <stop offset="78%" stop-color="#ffffff" stop-opacity="0.6" />
+      <stop offset="82%" stop-color="#ff7d95" stop-opacity="0.25" />
+      <stop offset="90%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Lower Film Windows Gradients -->
+    <linearGradient id="winGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#130d10" />
+      <stop offset="100%" stop-color="#29131c" />
+    </linearGradient>
+    <linearGradient id="winGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#190f14" />
+      <stop offset="100%" stop-color="#261019" />
+    </linearGradient>
+    <linearGradient id="winGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#260f18" />
+      <stop offset="45%" stop-color="#471424" />
+      <stop offset="75%" stop-color="#691a30" />
+      <stop offset="100%" stop-color="#3b101e" />
+    </linearGradient>
+    <linearGradient id="winGrad4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#30111d" />
+      <stop offset="100%" stop-color="#150a0f" />
+    </linearGradient>
+
+    <!-- Base Plinth Gradients -->
+    <linearGradient id="plinthTopGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#5c030e" />
+      <stop offset="35%" stop-color="#780616" />
+      <stop offset="70%" stop-color="#990b1f" />
+      <stop offset="100%" stop-color="#bd132b" />
+    </linearGradient>
+    <linearGradient id="plinthFrontGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#b8122a" />
+      <stop offset="25%" stop-color="#8a091b" />
+      <stop offset="70%" stop-color="#57030e" />
+      <stop offset="100%" stop-color="#2a0006" />
+    </linearGradient>
+    <linearGradient id="plinthBevelHighlight" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6b0613" stop-opacity="0.3" />
+      <stop offset="20%" stop-color="#b31228" />
+      <stop offset="60%" stop-color="#e32541" />
+      <stop offset="74%" stop-color="#ffb8c5" />
+      <stop offset="78%" stop-color="#ffffff" />
+      <stop offset="82%" stop-color="#ff8fa3" />
+      <stop offset="92%" stop-color="#a80e22" />
+      <stop offset="100%" stop-color="#4d020a" stop-opacity="0.4" />
+    </linearGradient>
+
+    <!-- Fillet Collar Highlight Gradient -->
+    <linearGradient id="collarGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0" />
+      <stop offset="65%" stop-color="#ff8da3" stop-opacity="0.2" />
+      <stop offset="78%" stop-color="#ffffff" stop-opacity="0.85" />
+      <stop offset="85%" stop-color="#ff708c" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+
+  <!-- ==================== GROUND SHADOWS ==================== -->
+  <g id="ground-shadows">
+    <ellipse cx="300" cy="578" rx="250" ry="18" fill="url(#shadowWide)" />
+    <ellipse cx="300" cy="576" rx="210" ry="11" fill="url(#shadowTight)" />
+  </g>
+
+  <!-- ==================== BASE PLINTH (SQUARE PLATE) ==================== -->
+  <g id="base-plinth">
+    <!-- Front Face (Plate Thickness) -->
+    <path d="M 52,538 Q 48,558 72,558 L 528,558 Q 552,558 548,538 L 550,554 Q 552,574 526,574 L 74,574 Q 48,574 50,554 Z"
+          fill="url(#plinthFrontGrad)" />
+
+    <!-- Bottom Front Lip Shadow Line -->
+    <path d="M 64,572 Q 48,572 50,556 L 52,562 Q 50,574 74,574 L 526,574 Q 550,574 548,562 L 550,556 Q 552,572 536,572 Z"
+          fill="#1f0004" opacity="0.7" />
+
+    <!-- Top Surface of Base Plate -->
+    <path d="M 136,375 L 464,375 Q 492,375 496,396 L 548,538 Q 552,558 528,558 L 72,558 Q 48,558 52,538 L 104,396 Q 108,375 136,375 Z"
+          fill="url(#plinthTopGrad)" />
+
+    <!-- Ambient Shadow cast by Cone on Plinth -->
+    <ellipse cx="300" cy="495" rx="180" ry="48" fill="url(#shadowOnPlinth)" />
+
+    <!-- Front Bevel Edge Highlight Stroke -->
+    <path d="M 66,558 L 534,558" stroke="url(#plinthBevelHighlight)" stroke-width="2.2" stroke-linecap="round" />
+    <path d="M 56,544 Q 52,558 70,558" stroke="url(#plinthBevelHighlight)" stroke-width="1.8" fill="none" opacity="0.6" />
+    <path d="M 544,544 Q 548,558 530,558" stroke="url(#plinthBevelHighlight)" stroke-width="1.8" fill="none" opacity="0.8" />
+  </g>
+
+  <!-- ==================== BASE FILLET / COLLAR ==================== -->
+  <g id="cone-collar">
+    <!-- Toroidal Collar Flare Base -->
+    <path d="M 124,514 C 124,476 195,450 300,450 C 405,450 476,476 476,514 C 476,542 405,550 300,550 C 195,550 124,542 124,514 Z"
+          fill="url(#coneRedGrad)" />
+
+    <!-- Ambient Occlusion Ring at Crevice -->
+    <path d="M 124,514 C 130,538 198,548 300,548 C 402,548 470,538 476,514 C 466,532 400,542 300,542 C 200,542 134,532 124,514 Z"
+          fill="#1c0104" opacity="0.75" />
+
+    <!-- Collar Rim Specular Crescent Highlight -->
+    <path d="M 270,548 C 350,548 435,540 458,524 C 472,514 472,500 456,482"
+          stroke="url(#collarGlow)" stroke-width="3.5" fill="none" stroke-linecap="round" />
+    <path d="M 310,547 C 375,547 438,539 456,525"
+          stroke="#ffffff" stroke-width="1.2" fill="none" stroke-linecap="round" opacity="0.9" />
+  </g>
+
+  <!-- ==================== LOWER RED CONE SECTION ==================== -->
+  <g id="lower-cone-section">
+    <!-- Flared Lower Cone Body -->
+    <path d="M 144,430 Q 300,462 456,430 L 476,514 C 450,536 380,546 300,546 C 220,546 150,536 124,514 Z"
+          fill="url(#coneRedGrad)" />
+
+    <!-- Specular Streak on Lower Flared Cone -->
+    <path d="M 405,433 Q 418,485 438,525 L 452,522 Q 430,480 417,432 Z"
+          fill="url(#specularStreak)" opacity="0.7" />
+
+    <!-- Top Bevel Rim of Lower Cone (Under Filmstrip) -->
+    <path d="M 144,430 Q 300,462 456,430"
+          stroke="#ff8da3" stroke-width="1.2" fill="none" opacity="0.7" />
+  </g>
+
+  <!-- ==================== LOWER FILMSTRIP BAND ==================== -->
+  <g id="lower-filmstrip">
+    <!-- Dark Under-Seam Shadow -->
+    <path d="M 144,430 Q 300,462 456,430 L 458,433 Q 300,465 142,433 Z" fill="#120205" />
+
+    <!-- Filmstrip Smoked Acrylic Base Shape -->
+    <path d="M 180,320 Q 300,345 420,320 L 456,430 Q 300,462 144,430 Z"
+          fill="url(#filmBaseGrad)" />
+
+    <!-- Filmstrip Boundary Track Lines -->
+    <path d="M 166,338 Q 300,363 434,338" stroke="#12070a" stroke-width="1.4" fill="none" opacity="0.8" />
+    <path d="M 152,442 Q 300,474 448,442" stroke="#12070a" stroke-width="1.4" fill="none" opacity="0.8" />
+
+    <!-- Sprockets: Top Track (Lower Filmstrip, 17 Perforations) -->
+    <g id="lower-sprockets-top">
+      <rect x="170" y="327" width="4.2" height="4.5" rx="1.2" transform="rotate(18 172 329)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="186" y="335" width="4.8" height="4.5" rx="1.2" transform="rotate(16 188 337)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="201" y="340" width="5.4" height="4.5" rx="1.2" transform="rotate(13 204 342)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="217" y="344" width="5.9" height="4.5" rx="1.2" transform="rotate(11 220 346)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="233" y="347" width="6.2" height="4.5" rx="1.2" transform="rotate(9 236 349)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="249" y="349" width="6.5" height="4.5" rx="1.2" transform="rotate(7 252 351)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="265" y="351" width="6.6" height="4.5" rx="1.2" transform="rotate(4.5 268 353)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="281" y="352" width="6.7" height="4.5" rx="1.2" transform="rotate(2 284 354)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="297" y="352.5" width="6.8" height="4.5" rx="1.2" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="313" y="352" width="6.7" height="4.5" rx="1.2" transform="rotate(-2 316 354)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="329" y="351" width="6.6" height="4.5" rx="1.2" transform="rotate(-4.5 332 353)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="345" y="349" width="6.5" height="4.5" rx="1.2" transform="rotate(-7 348 351)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="361" y="347" width="6.2" height="4.5" rx="1.2" transform="rotate(-9 364 349)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="377" y="344" width="5.9" height="4.5" rx="1.2" transform="rotate(-11 380 346)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="393" y="340" width="5.4" height="4.5" rx="1.2" transform="rotate(-13 396 342)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="410" y="335" width="4.8" height="4.5" rx="1.2" transform="rotate(-16 412 337)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="426" y="327" width="4.2" height="4.5" rx="1.2" transform="rotate(-18 428 329)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+    </g>
+
+    <!-- Sprockets: Bottom Track (Lower Filmstrip, 17 Perforations) -->
+    <g id="lower-sprockets-bottom">
+      <rect x="154" y="435" width="4.8" height="5" rx="1.2" transform="rotate(18 156 437)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="171" y="440" width="5.5" height="5" rx="1.2" transform="rotate(16 174 442)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="189" y="445" width="6.2" height="5" rx="1.2" transform="rotate(13 192 447)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="207" y="449" width="6.8" height="5" rx="1.2" transform="rotate(11 210 451)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="225" y="453" width="7.2" height="5" rx="1.2" transform="rotate(9 228 455)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="242" y="456" width="7.5" height="5" rx="1.2" transform="rotate(7 246 458)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="260" y="458" width="7.7" height="5" rx="1.2" transform="rotate(4.5 264 460)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="278" y="460" width="7.8" height="5" rx="1.2" transform="rotate(2 282 462)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="296" y="460.5" width="7.8" height="5" rx="1.2" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="314" y="460" width="7.8" height="5" rx="1.2" transform="rotate(-2 318 462)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="332" y="458" width="7.7" height="5" rx="1.2" transform="rotate(-4.5 336 460)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="350" y="456" width="7.5" height="5" rx="1.2" transform="rotate(-7 354 458)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="368" y="453" width="7.2" height="5" rx="1.2" transform="rotate(-9 372 455)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="387" y="449" width="6.8" height="5" rx="1.2" transform="rotate(-11 390 451)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="405" y="445" width="6.2" height="5" rx="1.2" transform="rotate(-13 408 447)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="423" y="440" width="5.5" height="5" rx="1.2" transform="rotate(-16 426 442)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+      <rect x="442" y="435" width="4.8" height="5" rx="1.2" transform="rotate(-18 444 437)" fill="#0d0407" stroke="#260812" stroke-width="0.5" />
+    </g>
+
+    <!-- Film Frame Windows (4 Perspective Panels) -->
+    <!-- Frame 1 (Left) -->
+    <path d="M 188,342 Q 206,346 224,349 L 214,453 Q 190,447 166,440 Z"
+          fill="url(#winGrad1)" stroke="#0d0609" stroke-width="1.8" />
+    <path d="M 189,343 Q 206,347 222,350 L 213,451 Q 191,445 168,439 Z"
+          fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="0.8" />
+
+    <!-- Frame 2 (Center-Left) -->
+    <path d="M 232,350 Q 262,353 294,354 L 294,460 Q 258,458 222,454 Z"
+          fill="url(#winGrad2)" stroke="#0d0609" stroke-width="1.8" />
+    <path d="M 233,351 Q 262,354 292,355 L 292,458 Q 258,456 224,452 Z"
+          fill="none" stroke="#ffffff" stroke-opacity="0.07" stroke-width="0.8" />
+
+    <!-- Frame 3 (Center-Right - Catches Specular Light) -->
+    <path d="M 306,354 Q 338,353 368,350 L 378,454 Q 342,458 306,460 Z"
+          fill="url(#winGrad3)" stroke="#0d0609" stroke-width="1.8" />
+    <path d="M 308,355 Q 338,354 366,351 L 376,452 Q 342,456 308,458 Z"
+          fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-width="0.8" />
+
+    <!-- Frame 4 (Right) -->
+    <path d="M 376,349 Q 394,346 412,342 L 434,440 Q 410,447 386,453 Z"
+          fill="url(#winGrad4)" stroke="#0d0609" stroke-width="1.8" />
+    <path d="M 378,350 Q 394,347 410,343 L 432,439 Q 410,445 388,451 Z"
+          fill="none" stroke="#ffffff" stroke-opacity="0.1" stroke-width="0.8" />
+
+    <!-- Vertical Dividers Between Frames -->
+    <line x1="228" y1="350" x2="218" y2="453" stroke="#0a0306" stroke-width="3" />
+    <line x1="300" y1="354" x2="300" y2="460" stroke="#0a0306" stroke-width="3.5" />
+    <line x1="372" y1="350" x2="382" y2="453" stroke="#0a0306" stroke-width="3" />
+
+    <!-- Gloss Sheen Across Filmstrip -->
+    <path d="M 180,320 Q 300,345 420,320 L 456,430 Q 300,462 144,430 Z"
+          fill="url(#filmGlossGrad)" />
+  </g>
+
+  <!-- ==================== MIDDLE RED CONE SECTION ==================== -->
+  <g id="middle-red-cone">
+    <!-- Seam Shadow Above Filmstrip -->
+    <path d="M 180,320 Q 300,345 420,320 L 421,322 Q 300,347 179,322 Z" fill="#1f0206" />
+
+    <!-- Middle Cone Body -->
+    <path d="M 218,195 Q 300,211 382,195 L 420,320 Q 300,345 180,320 Z"
+          fill="url(#coneRedGrad)" />
+
+    <!-- Candy Coat Specular Streak -->
+    <path d="M 364,196 Q 375,255 396,321 L 409,320 Q 388,255 376,195 Z"
+          fill="url(#specularStreak)" opacity="0.8" />
+
+    <!-- Top Bevel Highlight Rim of Middle Cone -->
+    <path d="M 218,195 Q 300,211 382,195"
+          stroke="#ff8299" stroke-width="1.1" fill="none" opacity="0.75" />
+  </g>
+
+  <!-- ==================== UPPER FILMSTRIP BAND ==================== -->
+  <g id="upper-filmstrip">
+    <!-- Dark Under-Seam Shadow -->
+    <path d="M 218,195 Q 300,211 382,195 L 383,197 Q 300,213 217,197 Z" fill="#140306" />
+
+    <!-- Filmstrip Smoked Acrylic Base Shape -->
+    <path d="M 248,95 Q 300,104 352,95 L 382,195 Q 300,211 218,195 Z"
+          fill="url(#filmBaseGrad)" />
+
+    <!-- Filmstrip Boundary Track Lines -->
+    <path d="M 243,106 Q 300,115 357,106" stroke="#12070a" stroke-width="1.1" fill="none" opacity="0.8" />
+    <path d="M 226,186 Q 300,202 374,186" stroke="#12070a" stroke-width="1.1" fill="none" opacity="0.8" />
+
+    <!-- Sprockets: Top Track (Upper Filmstrip, 11 Perforations) -->
+    <g id="upper-sprockets-top">
+      <rect x="252" y="99" width="3.2" height="3" rx="0.8" transform="rotate(12 254 100)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="261" y="102" width="3.6" height="3" rx="0.8" transform="rotate(9.5 263 103)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="270" y="104" width="4.0" height="3" rx="0.8" transform="rotate(7 272 105)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="280" y="105.5" width="4.3" height="3" rx="0.8" transform="rotate(5 282 107)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="289" y="106.5" width="4.5" height="3" rx="0.8" transform="rotate(2.5 291 108)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="298" y="107" width="4.5" height="3" rx="0.8" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="307" y="106.5" width="4.5" height="3" rx="0.8" transform="rotate(-2.5 309 108)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="316" y="105.5" width="4.3" height="3" rx="0.8" transform="rotate(-5 318 107)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="326" y="104" width="4.0" height="3" rx="0.8" transform="rotate(-7 328 105)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="335" y="102" width="3.6" height="3" rx="0.8" transform="rotate(-9.5 337 103)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="344" y="99" width="3.2" height="3" rx="0.8" transform="rotate(-12 346 100)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+    </g>
+
+    <!-- Sprockets: Bottom Track (Upper Filmstrip, 11 Perforations) -->
+    <g id="upper-sprockets-bottom">
+      <rect x="228" y="195" width="3.8" height="3.4" rx="0.9" transform="rotate(14 230 196)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="242" y="201" width="4.3" height="3.4" rx="0.9" transform="rotate(11 244 202)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="256" y="205" width="4.8" height="3.4" rx="0.9" transform="rotate(8.5 258 206)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="270" y="207.5" width="5.2" height="3.4" rx="0.9" transform="rotate(5.5 272 209)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="284" y="209" width="5.4" height="3.4" rx="0.9" transform="rotate(3 286 210)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="297.5" y="209.5" width="5.4" height="3.4" rx="0.9" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="311" y="209" width="5.4" height="3.4" rx="0.9" transform="rotate(-3 314 210)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="325" y="207.5" width="5.2" height="3.4" rx="0.9" transform="rotate(-5.5 328 209)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="340" y="205" width="4.8" height="3.4" rx="0.9" transform="rotate(-8.5 342 206)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="354" y="201" width="4.3" height="3.4" rx="0.9" transform="rotate(-11 356 202)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+      <rect x="368" y="195" width="3.8" height="3.4" rx="0.9" transform="rotate(-14 370 196)" fill="#0d0407" stroke="#260812" stroke-width="0.4" />
+    </g>
+
+    <!-- Upper Frame Windows -->
+    <path d="M 252,110 Q 262,112 272,113 L 264,192 Q 248,187 236,182 Z"
+          fill="url(#winGrad1)" stroke="#0d0609" stroke-width="1.3" />
+    <path d="M 276,114 Q 286,115 296,116 L 296,197 Q 278,195 268,193 Z"
+          fill="url(#winGrad2)" stroke="#0d0609" stroke-width="1.3" />
+    <path d="M 304,116 Q 314,115 324,114 L 332,193 Q 320,195 304,197 Z"
+          fill="url(#winGrad3)" stroke="#0d0609" stroke-width="1.3" />
+    <path d="M 328,113 Q 338,112 348,110 L 364,182 Q 352,187 336,192 Z"
+          fill="url(#winGrad4)" stroke="#0d0609" stroke-width="1.3" />
+
+    <!-- Dividers -->
+    <line x1="274" y1="114" x2="266" y2="193" stroke="#0a0306" stroke-width="2.2" />
+    <line x1="300" y1="116" x2="300" y2="197" stroke="#0a0306" stroke-width="2.4" />
+    <line x1="326" y1="114" x2="334" y2="193" stroke="#0a0306" stroke-width="2.2" />
+
+    <!-- Gloss Sheen Across Upper Filmstrip -->
+    <path d="M 248,95 Q 300,104 352,95 L 382,195 Q 300,211 218,195 Z"
+          fill="url(#filmGlossGrad)" />
+  </g>
+
+  <!-- ==================== TOP CONE CAP & DOME APEX ==================== -->
+  <g id="top-cap">
+    <!-- Seam Shadow Above Filmstrip -->
+    <path d="M 248,95 Q 300,104 352,95 L 353,97 Q 300,106 247,97 Z" fill="#240207" />
+
+    <!-- Cap Body & Dome Contour -->
+    <path d="M 248,95 L 274,40 C 278,25 288,22 300,22 C 312,22 322,25 326,40 L 352,95 Q 300,104 248,95 Z"
+          fill="url(#coneRedGrad)" />
+
+    <!-- Dome Apex Radial Specular Hotspot -->
+    <ellipse cx="313" cy="34" rx="14" ry="9" transform="rotate(-15 313 34)"
+             fill="url(#domeHotspot)" />
+
+    <!-- Dome Top Crescent Edge Highlight -->
+    <path d="M 288,23 C 294,22 306,22 314,24 C 322,26 325,32 326,40"
+          stroke="#ffffff" stroke-width="1.5" fill="none" opacity="0.85" />
+
+    <!-- Specular Streak on Top Cone Body -->
+    <path d="M 318,38 L 338,95 L 347,94 L 325,37 Z"
+          fill="url(#specularStreak)" opacity="0.85" />
+
+    <!-- Top Cap Bottom Bevel Rim -->
+    <path d="M 248,95 Q 300,104 352,95"
+          stroke="#ff8ca0" stroke-width="1" fill="none" opacity="0.7" />
+  </g>
+
+  <!-- ==================== UNIFIED AMBIENT GLOSS OVERLAY ==================== -->
+  <g id="global-gloss">
+    <!-- Soft Vertical Light Ridge (Unifies cone reflection across all segments) -->
+    <path d="M 314,26 L 340,95 L 356,195 L 396,320 L 434,430 L 458,520 L 472,518 L 444,428 L 406,319 L 366,194 L 348,95 L 322,26 Z"
+          fill="url(#specularStreak)" opacity="0.45" />
+
+    <!-- Left Edge Soft Secondary Rim Reflection -->
+    <path d="M 286,24 L 260,95 L 232,195 L 198,320 L 160,430 L 138,515 L 132,513 L 152,430 L 190,320 L 224,195 L 252,95 L 280,24 Z"
+          fill="#ff859c" opacity="0.16" />
+  </g>
 </svg>

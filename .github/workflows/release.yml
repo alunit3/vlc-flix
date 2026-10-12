@@ -1,0 +1,104 @@
+# Builds VLCFlix for Windows x64 in VideoLAN's own win64 build image.
+#
+# - Run it by hand (Actions > Build > Run workflow) to get the installer and zip as
+#   workflow artifacts.
+# - Push a tag v<FLIX_VERSION> (e.g. v1.0.0) to also create a draft GitHub release with them.
+#
+# A full build takes a couple of hours, so it does not run on every push.
+name: Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # keep in step with flix/UPSTREAM and flix/build.ps1
+  VLC_IMAGE: registry.videolan.org/vlc-debian-win64-posix:20260611225331
+
+jobs:
+  win64:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Make room
+        # the build image alone is ~10 GB; the runner starts with much less than that free
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \
+                      /usr/local/share/boost /usr/local/.ghcup
+          sudo docker image prune --all --force
+          df -h /
+
+      - uses: actions/checkout@v4
+        with:
+          # the prebuilt contribs are looked up by an upstream commit in the history
+          fetch-depth: 0
+
+      - name: Version
+        id: version
+        run: |
+          version=$(sed -n 's/^FLIX_VERSION=//p' configure.ac)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match FLIX_VERSION $version in configure.ac"
+            exit 1
+          fi
+          echo "VLCFlix $version"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: flix/torrent/go.mod
+          cache-dependency-path: |
+            flix/torrent/go.sum
+            flix/web/go.sum
+
+      - name: Test the torrent helper
+        working-directory: flix/torrent
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Build the helpers
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p "$RUNNER_TEMP/helpers"
+          (cd flix/torrent && go build -trimpath -ldflags "-s -w" -o "$RUNNER_TEMP/helpers/flixtorrent.exe" .)
+          (cd flix/web && go build -trimpath -ldflags "-s -w -H=windowsgui" -o "$RUNNER_TEMP/helpers/flixweb.exe" .)
+          ls -la "$RUNNER_TEMP/helpers"
+
+      - name: Build and package
+        run: |
+          mkdir -p "$RUNNER_TEMP/build" dist
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/vlc" \
+            -v "$RUNNER_TEMP/build:/build" \
+            -v "$RUNNER_TEMP/helpers:/helpers:ro" \
+            -v "$GITHUB_WORKSPACE/dist:/dist" \
+            -e JOBS="$(nproc)" \
+            "$VLC_IMAGE" bash /vlc/flix/ci/build-win64.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VLCFlix-${{ steps.version.outputs.version }}-win64
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --draft \
+            --title "VLCFlix ${{ steps.version.outputs.version }}" \
+            --notes-file flix/ci/release-notes.md

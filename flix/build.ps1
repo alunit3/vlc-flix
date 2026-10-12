@@ -20,7 +20,10 @@ set -e
 git config --global --add safe.directory /vlc
 mkdir -p /build && cd /build
 export JOBS=$Jobs
-export VLC_CONTRIB_SHA=`$(cd /vlc && extras/ci/get-contrib-sha.sh win32)
+# The prebuilt contribs are named after the last upstream commit that changed them. The fork
+# itself changed extras/package/win32 (which get-contrib-sha.sh counts), so asking it from HEAD
+# names a fork commit VideoLAN never built and the download 404s. Use the pinned upstream one.
+export VLC_CONTRIB_SHA=`$(cd /vlc && git rev-list -1 `$(grep -oE '^commit: *[0-9a-f]{40}' flix/UPSTREAM | grep -oE '[0-9a-f]{40}') -- extras/tools contrib extras/ci extras/package/win32)
 export VLC_PREBUILT_CONTRIBS_URL=https://artifacts.videolan.org/vlc/win64/vlc-contrib-x86_64-w64-mingw32-`$VLC_CONTRIB_SHA.tar.zst
 echo "contribs: `$VLC_PREBUILT_CONTRIBS_URL"
 /vlc/extras/package/win32/build.sh -a x86_64 -p$rflag

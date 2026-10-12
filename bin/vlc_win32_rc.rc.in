@@ -1,5 +1,6 @@
-#define VERSION_NUMBER @VERSION_MAJOR@,@VERSION_MINOR@,@VERSION_REVISION@,@VERSION_EXTRA@
-#define VERSION_NUMBER_STR "@VERSION_MAJOR@,@VERSION_MINOR@,@VERSION_REVISION@,@VERSION_EXTRA@"
+/* VLCFlix: the version Windows shows for vlcflix.exe is VLCFlix's own (FLIX_VERSION) */
+#define VERSION_NUMBER @FLIX_VERSION_MAJOR@,@FLIX_VERSION_MINOR@,@FLIX_VERSION_REVISION@,0
+#define VERSION_NUMBER_STR "@FLIX_VERSION@"
 
 #include <winuser.h>
 
@@ -20,7 +21,7 @@ BEGIN
       VALUE "ProductVersion", VERSION_NUMBER_STR
       VALUE "InternalName", "vlcflix"
       VALUE "OriginalFilename", "vlcflix.exe"
-      VALUE "FileVersion", "@VERSION@"
+      VALUE "FileVersion", "@FLIX_VERSION@"
       VALUE "FileDescription", "VLCFlix"
       VALUE "LegalCopyright", "Copyright \251 @COPYRIGHT_YEARS@ VideoLAN and VLC Authors"
       VALUE "LegalTrademarks", "VLC media player, VideoLAN and x264 are registered trademarks from VideoLAN"

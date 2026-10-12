@@ -220,9 +220,9 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
          * taskbar grouping, the AppUserModelID and the icon the shell picks up when
          * it has no better source. Leaving it as org.VideoLAN.VLC is why a second
          * install and the stock player shared a taskbar icon and a group. */
-        libvlc_set_app_id (vlc, "org.VLCFlix.VLCFlix", PACKAGE_VERSION,
+        libvlc_set_app_id (vlc, "org.VLCFlix.VLCFlix", FLIX_VERSION,
                            PACKAGE_NAME);
-        libvlc_set_user_agent (vlc, "VLCFlix", "VLCFlix/"PACKAGE_VERSION);
+        libvlc_set_user_agent (vlc, "VLCFlix", "VLCFlix/"FLIX_VERSION);
         libvlc_InternalAddIntf (vlc->p_libvlc_int, NULL);
         libvlc_InternalPlay (vlc->p_libvlc_int);
 

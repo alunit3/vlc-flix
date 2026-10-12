@@ -9,6 +9,14 @@ VERSION_REVISION=0
 VERSION_EXTRA=0
 VERSION_DEV=dev
 
+dnl flix: the version of VLCFlix itself, as the user sees it (About box, installer, user
+dnl agent). AC_INIT above stays VLC's own: plugin entry points, the libvlc ABI and the
+dnl prebuilt contribs are named after it. CI reads this line for the release asset names.
+FLIX_VERSION=1.0.0
+FLIX_VERSION_MAJOR=1
+FLIX_VERSION_MINOR=0
+FLIX_VERSION_REVISION=0
+
 VERSION_DATE=$(
     VERSION_PATTERN='^v?([[0-9]]+\.?)+(-[[0-9]]+)?$'
     VERSION_TAG=$(git tag --points-at HEAD --sort=-version:refname 2>/dev/null | grep -E "$VERSION_PATTERN" | head -n 1)
@@ -5228,9 +5236,14 @@ AS_VAR_IF(with_libfuzzer, no, [], [
 dnl
 dnl  Stuff used by the program
 dnl
-VERSION_MESSAGE="${VERSION} ${CODENAME}"
+VERSION_MESSAGE="${FLIX_VERSION} (VLC ${VERSION} ${CODENAME})"
 COPYRIGHT_MESSAGE="Copyright © ${COPYRIGHT_YEARS} the VideoLAN team"
 AC_DEFINE_UNQUOTED([VERSION_MESSAGE], "${VERSION_MESSAGE}", [Simple version string])
+AC_DEFINE_UNQUOTED([FLIX_VERSION], "${FLIX_VERSION}", [VLCFlix version])
+AC_SUBST([FLIX_VERSION])
+AC_SUBST([FLIX_VERSION_MAJOR])
+AC_SUBST([FLIX_VERSION_MINOR])
+AC_SUBST([FLIX_VERSION_REVISION])
 AC_DEFINE_UNQUOTED([COPYRIGHT_MESSAGE], "${COPYRIGHT_MESSAGE}", [Copyright string])
 AC_DEFINE_UNQUOTED([COPYRIGHT_YEARS], "${COPYRIGHT_YEARS}", [The copyright years])
 AC_DEFINE_UNQUOTED([CONFIGURE_LINE], "${CONFIGURE_LINE}", [The ./configure command line])

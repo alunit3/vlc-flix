@@ -536,8 +536,10 @@ if [ -n "$DISABLEGUI" ]; then
     CONFIGFLAGS="$CONFIGFLAGS --disable-qt --disable-skins2"
     MCONFIGFLAGS="$MCONFIGFLAGS -Dqt=disabled -Dskins2=disabled"
 else
-    CONFIGFLAGS="$CONFIGFLAGS --enable-qt --enable-skins2 --enable-update-check"
-    MCONFIGFLAGS="$MCONFIGFLAGS -Dqt=enabled -Dskins2=enabled -Dupdate-check=enabled"
+    # flix: no update check. It asks VideoLAN's server, which only ever knows stock VLC,
+    # so it would offer VLCFlix users a "new version" that is a different program.
+    CONFIGFLAGS="$CONFIGFLAGS --enable-qt --enable-skins2"
+    MCONFIGFLAGS="$MCONFIGFLAGS -Dqt=enabled -Dskins2=enabled"
 fi
 if [ -n "$WINSTORE" ]; then
     CONFIGFLAGS="$CONFIGFLAGS --enable-winstore-app"

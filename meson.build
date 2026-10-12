@@ -981,7 +981,11 @@ endif
 
 cdata.set_quoted('VERSION',         vlc_version)
 cdata.set_quoted('PACKAGE_VERSION', vlc_version)
-cdata.set_quoted('VERSION_MESSAGE', f'@vlc_version@ @vlc_version_codename@')
+# flix: VLCFlix's own version for the user (keep in step with FLIX_VERSION in configure.ac);
+# the project version above stays VLC's, which plugin entry points are named after
+flix_version = '1.0.0'
+cdata.set_quoted('FLIX_VERSION', flix_version)
+cdata.set_quoted('VERSION_MESSAGE', f'@flix_version@ (VLC @vlc_version@ @vlc_version_codename@)')
 
 cdata.set('VERSION_MAJOR',      vlc_version_major)
 cdata.set('VERSION_MINOR',      vlc_version_minor)
@@ -1081,6 +1085,15 @@ if host_system == 'windows'
     rc_conf = cdata
     rc_conf.set('VERSION', vlc_version)
     rc_conf.set('COPYRIGHT_YEARS', vlc_copyright_years)
+    # flix: plain (unquoted) values for vlc_win32_rc.rc.in, in a copy of its own:
+    # FLIX_VERSION in cdata is the quoted C string that config.h needs
+    flix_rc_conf = configuration_data()
+    flix_rc_conf.merge_from(rc_conf)
+    rc_conf = flix_rc_conf
+    rc_conf.set('FLIX_VERSION', flix_version)
+    rc_conf.set('FLIX_VERSION_MAJOR', flix_version.split('.')[0])
+    rc_conf.set('FLIX_VERSION_MINOR', flix_version.split('.')[1])
+    rc_conf.set('FLIX_VERSION_REVISION', flix_version.split('.')[2])
 endif
 
 # Enable stream outputs

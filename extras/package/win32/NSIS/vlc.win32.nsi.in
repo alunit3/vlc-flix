@@ -6,11 +6,12 @@
 ; VLCFlix: the product is a fork, so it installs under its own name. PRODUCT_NAME also
 ; names the uninstall key and the Start Menu / Desktop shortcuts, so those follow.
 !define PRODUCT_NAME "VLCFlix"
-!define VERSION @VERSION@
-!define PRODUCT_VERSION @VERSION@
+; VLCFlix: its own version (FLIX_VERSION in configure.ac), not the VLC it is built on
+!define VERSION @FLIX_VERSION@
+!define PRODUCT_VERSION @FLIX_VERSION@
 !define PRODUCT_GROUP "VLCFlix"
 !define PRODUCT_PUBLISHER "VLCFlix"
-!define PRODUCT_WEB_SITE "https://www.videolan.org/"
+!define PRODUCT_WEB_SITE "https://github.com/alunit3/vlc-flix"
 !define PRODUCT_DIR_REGKEY "Software\VLCFlix\VLCFlix"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME}"
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
@@ -323,6 +324,9 @@ skip_uninstall32_cleanup:
   !insertmacro InstallFolder hrtfs
 @BUILD_SKINS_TRUE@   !insertmacro InstallFolder skins
 @BUILD_LUA_TRUE@     !insertmacro InstallFolder lua
+  ; VLCFlix: the torrent and web player helpers (flixtorrent.exe, flixweb.exe). Not optional:
+  ; without them the Stream and Watch online buttons have nothing to start.
+  !insertmacro InstallFolder flix
 
   ; Generate the cache and add it to uninstall.log
   nsExec::ExecToStack '"$INSTDIR\vlc-cache-gen.exe" $INSTDIR\plugins'
@@ -793,9 +797,9 @@ Section -Post
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" \
     "Publisher" "${PRODUCT_PUBLISHER}"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" \
-    "VersionMajor"  "@VERSION_MAJOR@"
+    "VersionMajor"  "@FLIX_VERSION_MAJOR@"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" \
-    "VersionMinor" "@VERSION_MINOR@"
+    "VersionMinor" "@FLIX_VERSION_MINOR@"
 SectionEnd
 
 ;;;;;;;;;;;;;;;;;;;;;;;;

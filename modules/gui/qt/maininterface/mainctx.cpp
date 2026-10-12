@@ -1427,8 +1427,14 @@ int MainCtx::playTorrentStream(const QString &url, const QString &title)
     // services do. This used to play from 0 and seek from QML once playback had begun,
     // then seek again four seconds later when the position had not moved yet (it cannot,
     // while the first seek is still buffering). Every one of those seeks dropped a
-    // connection and opened another. start-time lets the demuxer go to the right place
-    // through the file's own index before anything is played.
+    // connection and opened another. flix-resume-time is a seek queued before the input
+    // starts (vlc_player_input_New), so the demuxer goes to the right place through the
+    // file's own index before anything is played.
+    //
+    // It is not start-time, which this used before: start-time makes the saved time the
+    // seek bar's zero. The bar read 0:00 at the resume point against only the time left,
+    // "Start over" went back to the resume point, and the position saved for the next
+    // resume was counted from it, so every continue landed earlier than the last.
     int startAt = 0;
     if( torrentResume() > 0.0 )
     {
@@ -1439,7 +1445,7 @@ int MainCtx::playTorrentStream(const QString &url, const QString &title)
             seconds = e.value( QStringLiteral("fraction") ).toDouble() * e.value( QStringLiteral("length") ).toDouble();
         startAt = qMax( 0, int( seconds ) - 5 );
         if( startAt > 0 )
-            options << QStringLiteral("start-time=%1").arg( startAt );
+            options << QStringLiteral("flix-resume-time=%1").arg( startAt );
     }
 
     vlc::playlist::Media media{ url, name.isEmpty() ? url : name, options };

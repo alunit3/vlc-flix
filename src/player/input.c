@@ -1315,6 +1315,16 @@ vlc_player_input_New(vlc_player_t *player, input_item_t *item)
     }
     vlc_player_input_RestoreMlStates(input, false);
 
+    /* flix: a continued torrent stream opens at its saved time. Not through start-time:
+     * that makes the saved time the seek bar's zero (input_GetItemDuration and the
+     * timer's start_offset), so the bar read 0:00 there, the length was only what was
+     * left, a seek to 0 went back to the saved time and the position saved for the next
+     * resume was measured from it. Queued before the input starts, like the media
+     * library's own restore above: the demuxer still goes straight there. */
+    const float resume_time = var_InheritFloat(input->thread, "flix-resume-time");
+    if (resume_time > 0)
+        input_SetTime(input->thread, vlc_tick_from_sec(resume_time), false);
+
     if (player->video_string_ids)
         vlc_player_input_SelectTracksByStringIds(input, VIDEO_ES,
                                                  player->video_string_ids);

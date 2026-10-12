@@ -440,7 +440,7 @@ func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep boo
 		}
 	}
 	length := file.Length()
-	// Resuming, the player opens at the saved time (its start-time option), so it reads the
+	// Resuming, the player opens at the saved time (its flix-resume-time option), so it reads the
 	// container header, the index at the end and then the resume point. The header is all
 	// that is needed from the start: waiting for the full head would only hold "ready" back.
 	//

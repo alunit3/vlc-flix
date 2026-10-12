@@ -2261,6 +2261,11 @@ vlc_module_begin ()
     add_bool( "flix-no-sub-slave-osd", true, NULL, NULL )
         change_safe()
 
+    /* flix: the time (seconds) a continued torrent stream opens at, see
+     * vlc_player_input_New. Not start-time: that makes the time the seek bar's zero. */
+    add_float( "flix-resume-time", 0, NULL, NULL )
+        change_safe()
+
 
     set_subcategory( SUBCAT_INTERFACE_CONTROL )
     add_module_list_cat("control", SUBCAT_INTERFACE_CONTROL, NULL,

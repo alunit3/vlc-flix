@@ -135,6 +135,15 @@ Item {
 
             required property var modelData
 
+            // a stream started from a magnet link saved no poster of its own: show TMDB's,
+            // looked up by title the way the billboard above already does
+            FlixMeta {
+                id: cardMeta
+
+                name: (card.modelData.poster ?? "") ? "" : (card.modelData.title ?? "")
+            }
+            readonly property string posterUrl: (card.modelData.poster ?? "") || cardMeta.poster
+
             width: VLCStyle.dp(150, VLCStyle.scale)
             height: list.height
 
@@ -152,14 +161,14 @@ Item {
 
                 Image {
                     anchors.fill: parent
-                    source: card.modelData.poster ?? ""
+                    source: card.posterUrl
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     sourceSize.width: 300
                 }
 
                 Text {
-                    visible: !(card.modelData.poster ?? "")
+                    visible: card.posterUrl === ""
                     anchors.fill: parent
                     anchors.margins: VLCStyle.dp(10, VLCStyle.scale)
                     text: card.modelData.title ?? ""

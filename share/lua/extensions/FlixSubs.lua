@@ -21,7 +21,7 @@ function descriptor()
         shortdesc = "FlixSubs",          -- the interface finds the extension by this name
         version = VERSION,
         author = "VLCFlix",
-        capabilities = {},
+        capabilities = { "menu" },
     }
 end
 
@@ -212,6 +212,8 @@ local function download()
     last_path = saved
 
     local added = false
+    -- the second argument is autoselect, not the OSD flag: pick the subtitle straight
+    -- away. The "Subtitle slave added" message is suppressed on the C side instead.
     if vlc.player and vlc.player.add_subtitle then
         added = pcall(vlc.player.add_subtitle, saved, true)
     end
@@ -270,7 +272,55 @@ end
 -- window
 ------------------------------------------------------------------------------
 
+-- The window is built once and then only shown and hidden. Rebuilding it on every
+-- open is what made this work the first time and then never again: the close went
+-- through the extension's activate/deactivate machinery, and whichever half of that
+-- ended up out of step, the next open had nothing to show. Hiding instead leaves the
+-- window and the extension alive, so reopening is a show() on something that is
+-- already there.
+--
+-- Returns false when there is no usable window, so the caller builds one. The calls
+-- are guarded because a window the player has already torn down raises in Lua, and an
+-- error there must not stop the new one from being built.
+local function show()
+    if not dlg then
+        return false
+    end
+    -- show() before update(). update() only flushes if the window is already visible,
+    -- so doing it the other way round left the window in the state it had when it was
+    -- closed until something else happened to wake it up.
+    local ok = pcall(function()
+        dlg:show()
+        dlg:update()
+    end)
+    if not ok then
+        dlg = nil
+        return false
+    end
+    return true
+end
+
+-- Drop the window entirely. Leaving it around is what breaks the next open: Lua only
+-- allows one dialog per extension (vlc.__dialog is a single slot), and hiding is not
+-- freeing it. Anything that took this path with hide() alone left the handle dangling
+-- and every later build() failed with "Only one dialog allowed per extension!" - which
+-- is why the window came back once and then never again.
+local function dispose()
+    if not dlg then
+        return
+    end
+    local handle = dlg
+    dlg = nil
+    -- hide first: delete() is only legal once the interface has taken the window down
+    pcall(function() handle:hide() end)
+    pcall(function() handle:delete() end)
+    widgets = {}
+    results = {}
+end
+
 local function build()
+    -- a window from an earlier open may still be around; hide it so the two do not stack
+    if dlg then pcall(function() dlg:hide() end) end
     dlg = vlc.dialog("Find Subtitles Online")
 
     local uri, path = current_media()
@@ -325,17 +375,40 @@ local function build()
     dlg:show()
 end
 
+function build_if_needed()
+    if not show() then
+        build()
+    end
+end
+
 function activate()
-    build()
+    build_if_needed()
 end
 
 function deactivate()
-    if dlg then dlg:hide() end
-    dlg, widgets, results = nil, {}, {}
+    -- hand the single dialog slot back, or the next open cannot build a window
+    dispose()
+end
+
+-- one entry, id 1. The interface asks for it by this id when "Find Subtitles Online"
+-- is picked and the extension is already running, so that a second pick opens the
+-- window again instead of toggling it shut. The name has to be trigger_menu: that is
+-- what the Lua extension interface looks for.
+function menu()
+    return { "Find Subtitles Online" }
+end
+
+function trigger_menu(dlg_id)
+    if dlg_id ~= 1 then
+        return
+    end
+    build_if_needed()
 end
 
 function close()
-    vlc.deactivate()
+    -- hide the window and stay alive: the extension stays activated, so the next
+    -- pick goes through trigger_menu and simply shows it again
+    if dlg then pcall(function() dlg:hide() end) end
 end
 
 function input_changed() end

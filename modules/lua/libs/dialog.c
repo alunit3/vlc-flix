@@ -459,9 +459,12 @@ static const char key_opaque = 'A',
  */
 void luaopen_dialog( lua_State *L, void *opaque )
 {
+    /* flix: "vlc" was pushed here and never popped. luaopen_dialog runs on every
+     * trigger_menu(), so the stack grew by one each time the extension was opened. */
     lua_getglobal( L, "vlc" );
     lua_pushcfunction( L, vlclua_dialog_create );
     lua_setfield( L, -2, "dialog" );
+    lua_pop( L, 1 );
 
     /* Add a private pointer (opaque) in the registry
      * The &key pointer is used to have a unique entry in the registry
@@ -696,9 +699,18 @@ static int lua_GetDialogUpdate( lua_State *L )
  */
 int lua_DialogFlush( lua_State *L )
 {
+    /* flix: the two lookups below used to be left on the stack, so every flush leaked
+     * two slots. An extension that updates its window while it is open - the subtitle
+     * search window updates on every state change - ran this thousands of times. */
     lua_getglobal( L, "vlc" );
+    if( !lua_istable( L, -1 ) )
+    {
+        lua_pop( L, 1 );
+        return VLC_SUCCESS;
+    }
     lua_getfield( L, -1, "__dialog" );
     extension_dialog_t *p_dlg = ( extension_dialog_t* )lua_topointer( L, -1 );
+    lua_pop( L, 2 );
 
     if( !p_dlg )
         return VLC_SUCCESS;

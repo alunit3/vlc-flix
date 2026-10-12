@@ -94,6 +94,7 @@ struct lua_extension
     bool b_exiting;
 
     bool b_thread_running; //< Only accessed out of the extension thread.
+    bool b_thread_done; ///< Run() has finished, the thread can be joined. Protected by the command lock
     bool b_activated; ///< Protected by the command lock
     bool b_activating; ///< Protected by the command lock
     bool b_deactivating; ///< Protected by the command lock

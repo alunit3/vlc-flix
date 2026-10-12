@@ -218,8 +218,24 @@ void ExtensionsManager::openVLsub()
         if ( !extensionName || strcmp( extensionName, "FlixSubs" ) )
             continue;
 
+        const bool b_active = extension_IsActivated( p_extensions_manager, p_ext );
         vlc_mutex_unlock( &p_extensions_manager->lock );
-        triggerMenu( MENU_MAP( 0, array_index_p_ext ) );
+
+        /* FlixSubs has no menu entries of its own, so the old code went through the
+         * same path as the Extensions menu, where action 0 is a plain activate /
+         * deactivate toggle: the first pick opened the window and every pick after
+         * that hid it again. Ask a running extension to show its window instead, and
+         * only fall back to activating when there is nothing running yet.
+         *
+         * The trigger is also fallible - it is refused when the extension thread is
+         * gone or busy - and the old code ignored the return, so a refusal looked
+         * exactly like a window that would not open. */
+        int ret = VLC_SUCCESS;
+        if( b_active )
+            ret = extension_TriggerMenu( p_extensions_manager, p_ext, 1 );
+        if( b_active && ret == VLC_SUCCESS )
+            return;
+        extension_Activate( p_extensions_manager, p_ext );
         return;
     }
 

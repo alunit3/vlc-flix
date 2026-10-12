@@ -111,7 +111,19 @@ void ExtensionsDialogProvider::UpdateExtDialog(extension_dialog_t *p_dialog )
         dialog->has_lock = true;
         dialog->UpdateWidgets();
         dialog->has_lock = false;
-        dialog->setVisible( !p_dialog->b_hide );
+
+        /* flix: setVisible() on a window that is already there does not bring it
+         * forward. This dialog is parentless, so re-showing it left it behind the main
+         * window, which reads as "nothing happened" - the same symptom as a window that
+         * never came back at all. */
+        if( !p_dialog->b_hide )
+        {
+            dialog->setVisible( true );
+            dialog->raise();
+            dialog->activateWindow();
+        }
+        else
+            dialog->setVisible( false );
     }
     else
     {

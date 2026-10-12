@@ -85,15 +85,39 @@ int Activate(extension_t *p_ext)
     extensions_manager_t *mgr = sys->p_mgr;
 
     vlc_mutex_lock(&sys->command_lock);
-    if (sys->b_activating)
+    /* flix: b_exiting means the thread has been asked to finish. Treating a thread
+     * that is on its way out as running is what let a half-dead extension swallow
+     * commands: b_thread_running can still be true at this point, so the command is
+     * queued and signalled into a thread that is on its last iteration and will never
+     * read it. Once Run() marks itself done on its way out this resolves itself, and
+     * the check here covers the window in between. */
+    const bool thread_live = sys->b_thread_running && !sys->b_exiting;
+
+    /* The previous thread was told to finish but has not returned yet - it can still
+     * be inside Lua after the watch timer gave up on it - and it owns the Lua state
+     * until it does. Starting another thread now would put two threads on one state.
+     * Waiting for it here would freeze the interface, so refuse; the next attempt
+     * after it has gone succeeds. */
+    if (sys->b_thread_running && sys->b_exiting && !sys->b_thread_done)
+    {
+        vlc_mutex_unlock(&sys->command_lock);
+        vlc_debug(p_ext->logger, "Extension '%s' is still shutting down",
+                  p_ext->psz_title);
+        return VLC_EGENERIC;
+    }
+
+    /* An activation is already on its way to a thread that can act on it. */
+    if (sys->b_activating && thread_live)
     {
         vlc_mutex_unlock(&sys->command_lock);
         return VLC_SUCCESS;
     }
-    if (!sys->b_activated)
+
+    /* Queue an activation unless one is already waiting to be picked up. Leaving a
+     * command behind is deliberate when the thread is being restarted: the new thread
+     * finds it there and runs it, which is exactly what is wanted. */
+    if (sys->command == NULL && !sys->b_activated)
     {
-        /* Prepare first command */
-        assert(sys->command == NULL);
         sys->command = calloc(1, sizeof(*sys->command));
         if (!sys->command)
         {
@@ -101,18 +125,26 @@ int Activate(extension_t *p_ext)
             return VLC_ENOMEM;
         }
         sys->command->i_command = CMD_ACTIVATE; /* No params */
-        if (sys->b_thread_running)
-        {
-            vlc_debug(p_ext->logger, "Reactivating extension %s", p_ext->psz_title);
-            vlc_cond_signal(&sys->wait);
-        }
-        sys->b_activating = true;
+    }
+    sys->b_activating = true;
+    if (thread_live)
+    {
+        vlc_debug(p_ext->logger, "Reactivating extension %s", p_ext->psz_title);
+        vlc_cond_signal(&sys->wait);
     }
     vlc_mutex_unlock(&sys->command_lock);
 
-    if (!sys->b_thread_running)
+    if (!thread_live)
     {
         vlc_debug(p_ext->logger, "Activating extension '%s'", p_ext->psz_title);
+        /* A thread that ended on its own is still waiting to be joined. It has
+         * returned already (see the check above), so this does not block. */
+        if (sys->b_thread_running)
+        {
+            vlc_join(sys->thread, NULL);
+            sys->b_thread_running = false;
+        }
+        sys->b_thread_done = false;
         sys->b_exiting = false;
         if (vlc_clone(&sys->thread, Run, p_ext) != VLC_SUCCESS)
         {
@@ -129,6 +161,11 @@ int Activate(extension_t *p_ext)
     };
 
     vlc_player_Lock(mgr->player);
+    /* flix: an extension the watch timer killed never went through
+     * QueueDeactivateCommand(), so its listener is still registered. Now that it can
+     * be started again, drop that one first rather than add a second. */
+    if (sys->player_listener != NULL)
+        vlc_player_RemoveListener(mgr->player, sys->player_listener);
     sys->player_listener =
         vlc_player_AddListener(mgr->player, &player_cbs, p_ext);
     vlc_player_Unlock(mgr->player);
@@ -143,6 +180,7 @@ error_listener:
     vlc_cond_signal(&sys->wait);
     vlc_mutex_unlock(&sys->command_lock);
     vlc_join(sys->thread, NULL);
+    sys->b_thread_running = false; /* joined: neither Activate() nor Close() may join again */
     return VLC_ENOMEM;
 }
 
@@ -194,7 +232,9 @@ bool QueueDeactivateCommand( extension_t *p_ext )
     vlc_cond_signal(&sys->wait);
 
     vlc_player_Lock(sys->p_mgr->player);
-    vlc_player_RemoveListener(sys->p_mgr->player, sys->player_listener);
+    if (sys->player_listener != NULL)
+        vlc_player_RemoveListener(sys->p_mgr->player, sys->player_listener);
+    sys->player_listener = NULL;
     vlc_player_Unlock(sys->p_mgr->player);
 
     return true;
@@ -467,6 +507,21 @@ static void* Run( void *data )
 
     vlc_mutex_unlock(&sys->command_lock);
     msg_Dbg( p_mgr, "Extension thread end: '%s'", p_ext->psz_title );
+
+    /* flix: say that we are gone. After the thread had ended once - the watch timer
+     * killing a slow extension does it - every later Activate() queued a command and
+     * signalled a condition variable that nothing was waiting on. The command was
+     * never consumed, b_activating stayed set forever, and from then on activating the
+     * extension did nothing at all: no window, no message, nothing. b_thread_done is
+     * what lets Activate() join this thread and start a new one. b_thread_running is
+     * left alone: it means "started and not joined yet", which is still true, and the
+     * shutdown path relies on it to join. */
+    vlc_mutex_lock(&sys->command_lock);
+    sys->b_thread_done = true;
+    sys->b_activating = false;
+    sys->b_exiting = true;
+    sys->b_activated = false;
+    vlc_mutex_unlock(&sys->command_lock);
 
     // Note: At this point, the extension should be deactivated
     return NULL;

@@ -29,7 +29,10 @@ export JOBS=${JOBS:-$(nproc)}
 echo "VLCFlix $VERSION, contribs $VLC_CONTRIB_SHA, $JOBS jobs"
 
 mkdir -p /build && cd /build
-/vlc/extras/package/win32/build.sh -a x86_64 -p -r
+# -r is a release build, and on its own it also runs VideoLAN's packaging (make package-win32)
+# before the Go helpers are in place; "-i none" keeps the release build and leaves the
+# packaging to the steps below
+/vlc/extras/package/win32/build.sh -a x86_64 -p -r -i none
 
 cd /build/win64
 # install, strip, and lay out the installer scripts next to the files

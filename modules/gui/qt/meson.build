@@ -639,6 +639,7 @@ qml_modules += {
     'outdir' : 'VLC/MainInterface',
     'sources': files(
         'maininterface/qml/FlixNavTabs.qml',
+        'maininterface/qml/FlixNoMedialib.qml',
         'maininterface/qml/LocalTopbar.qml',
         'maininterface/qml/MenuTopbar.qml',
         'maininterface/qml/MainInterface.qml',
@@ -756,6 +757,8 @@ qml_modules += {
        'player/qml/PIPPlayer.qml',
        'player/qml/FlixPauseOverlay.qml',
        'player/qml/FlixBackButton.qml',
+       'player/qml/FlixNowPlaying.qml',
+       'player/qml/FlixRatingBanner.qml',
        'player/qml/FlixResumeToast.qml',
        'player/qml/FlixTorrentStats.qml',
        'player/qml/FlixSubOffer.qml',
@@ -1102,6 +1105,28 @@ if qt6_dep.found()
         qresources: qrc_files,
         include_directories: qt_include_dir,
         dependencies: qt6_dep,
+        # flix: assets.qrc pulls in the window/tray icons, but meson was not told they
+        # are inputs, so new artwork did not reach the plugin. autotools had this in
+        # Makefile.am; this is the same dependency on the meson side.
+        depend_files: files(
+            '../../share/icons/vlc.ico',
+            '../../share/icons/16x16/vlc.png',
+            '../../share/icons/32x32/vlc.png',
+            '../../share/icons/48x48/vlc.png',
+            '../../share/icons/128x128/vlc.png',
+            '../../share/icons/256x256/vlc.png',
+            '../../share/icons/16x16/vlc-xmas.png',
+            '../../share/icons/32x32/vlc-xmas.png',
+            '../../share/icons/48x48/vlc-xmas.png',
+            '../../share/icons/128x128/vlc-xmas.png',
+            '../../share/icons/256x256/vlc-xmas.png',
+            '../../share/icons/16x16/vlc-aprilfools.png',
+            '../../share/icons/32x32/vlc-aprilfools.png',
+            '../../share/icons/48x48/vlc-aprilfools.png',
+            '../../share/icons/128x128/vlc-aprilfools.png',
+            '../../share/icons/256x256/vlc-aprilfools.png',
+            '../../share/icons/128x128/vlc-kb.png',
+        ),
         rcc_extra_arguments: qt_rcc_extra_arguments)
 
     qt_sources = files('qt.cpp')

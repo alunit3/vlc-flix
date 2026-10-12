@@ -455,13 +455,25 @@ public:
     // fraction (0.03..0.95) saved for the torrent just started, 0 when none
     Q_INVOKABLE double torrentResume() const;
     Q_INVOKABLE void saveTorrentResume(double fraction, int seconds, int length);
+    // a local file that was watched part way: kept here because the media library's own
+    // history only lists files of the library, never a file that was just opened
+    // one entry from the library's old history (only kept when it is not already known)
+    Q_INVOKABLE void importResume(const QString &mrl, const QString &name, double fraction, qint64 updated);
+    // forget every "continue watching" entry (files, torrents, online players)
+    Q_INVOKABLE void clearResume();
+    Q_INVOKABLE void saveLocalResume(const QString &mrl, const QString &name, double fraction, int seconds, int length);
     // user trackers (one URL per line); setUserTrackers returns {saved, invalid:[...]}
     Q_INVOKABLE QString userTrackers() const;
     Q_INVOKABLE QVariantMap setUserTrackers(const QString &text);
     // storage used by VLCFlix: [{kind, label, bytes, files}] and clearing one kind
     Q_INVOKABLE QVariantList storageInfo() const;
     Q_INVOKABLE bool clearStorage(const QString &kind);
-    Q_INVOKABLE bool torrentRunning() const { return m_streamProc != nullptr; }
+    // True while a torrent stream is actually holding its data files open. Not the
+    // same as "the helper is running": the helper lives as long as this process does.
+    Q_PROPERTY(bool torrentActive READ torrentActive NOTIFY torrentActiveChanged FINAL)
+    bool torrentActive() const;
+    // per-item options for a torrent stream; one place so both start dialogs agree
+    Q_INVOKABLE QStringList torrentStreamOptions(const QString &title) const;
 
     // VLCFlix settings: the flix-* / flixsubs-* VLC options (a fixed list), kept in the VLC settings file
     Q_INVOKABLE QVariant vlcOption(const QString &name) const;
@@ -602,6 +614,16 @@ protected:
     double m_resumeFraction = 0.0;
     class QProcess *m_sourcesProc = nullptr;
     class QProcess *m_streamProc = nullptr;
+    // flix: the data dir of the stream we started, so it can be removed when the
+    // stream ends. The helper is killed rather than asked to leave on Windows, so its
+    // own cleanup never runs and the folder outlived it.
+    QString m_torrentDataDir;
+    // True while something is actually reading the torrent files. m_streamProc only
+    // says the helper exists, which on Windows is as long as this process.
+    bool m_torrentActive = false;
+    // bumped only when a *torrent* starts, so that starting a local film in the
+    // two-second window after a stream ends cannot cancel the pending stop
+    quint64 m_torrentGeneration = 0;
     QByteArray m_streamBuffer;
     QString m_torrentError;
     QVariantMap m_torrentStats;
@@ -612,11 +634,14 @@ protected:
     void writeResume(const QVariantMap &all) const;
     QStringList trackerArgs() const;
     QStringList rateArgs() const;
+    QStringList streamArgs() const;
     class QProcess *m_filesProc = nullptr;
     class QProcess *m_webProc = nullptr;
     QString torrentHelper() const;
     QString torrentDir() const;
     void stopTorrent();
+    void setTorrentActive( bool );
+    bool playingTorrentStream() const;
     void flushMetaRequests();
     void queueMeta(const QString &key, const QVariantMap &req);
 
@@ -740,6 +765,7 @@ signals:
     void torrentStatus(const QVariantMap &status);
     void torrentStatsChanged();
     void torrentSessionChanged();
+    void torrentActiveChanged();
     void resumeChanged();
     void torrentFilesReady(const QString &name, const QVariantList &files, const QString &error);
 

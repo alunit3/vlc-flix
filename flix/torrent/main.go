@@ -52,8 +52,11 @@ func main() {
 		startFrac := fs.Float64("start-fraction", 0, "position (0..1) the player will seek to: that part is buffered before the stream is announced")
 		rateLimit := fs.Int64("rate-limit", 0, "download speed limit in bytes/s (0: unlimited)")
 		uploadLimit := fs.Int64("upload-rate-limit", 0, "upload speed limit in bytes/s (0: unlimited)")
+		streamOnly := fs.Bool("stream-only", true, "fetch only what the player is about to need, instead of the whole file")
+		window := fs.Int64("stream-window", 32<<20, "how far ahead of the playhead to fetch, in bytes (stream-only)")
 		fs.Parse(os.Args[2:])
-		os.Exit(runStream(*magnet, *torrentFile, *fileIdx, *dataDir, *keep, *parent, *startFrac, *rateLimit, *uploadLimit))
+		os.Exit(runStream(*magnet, *torrentFile, *fileIdx, *dataDir, *keep, *parent, *startFrac,
+			*rateLimit, *uploadLimit, *streamOnly, *window))
 	case "files":
 		fs := flag.NewFlagSet("files", flag.ExitOnError)
 		fs.StringVar(&trackersFile, "trackers-file", "", "text file with extra trackers (one per line)")

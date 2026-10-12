@@ -117,6 +117,7 @@ FocusScope {
         if (!MainCtx.playerView)
             return
         const stopPlayback = MainCtx.hasEmbededVideo && !MainCtx.canShowVideoPIP
+        flixResumeToast.saveNow()
         MainCtx.playerView = false
         if (stopPlayback)
             Qt.callLater(function() { MainPlaylistController.stop() })
@@ -943,15 +944,32 @@ FocusScope {
         }
     }
 
+    // flix: title, year, age rating, runtime and synopsis of what is playing
+    FlixNowPlaying {
+        id: flixNowPlaying
+    }
+
     // flix: "You're watching" screen when paused and the controls are hidden
     FlixPauseOverlay {
         id: flixPauseOverlay
 
         anchors.fill: parent
+        np: flixNowPlaying
+    }
+
+    // flix: "| RATING 16+" for a few seconds when a title starts
+    FlixRatingBanner {
+        anchors.left: parent.left
+        anchors.leftMargin: VLCStyle.dp(48, VLCStyle.scale)
+        anchors.top: parent.top
+        anchors.topMargin: VLCStyle.dp(56, VLCStyle.scale)
+        np: flixNowPlaying
     }
 
     // flix: "Resuming from 12:34 - Start over"
     FlixResumeToast {
+        id: flixResumeToast
+
         anchors.left: parent.left
         anchors.leftMargin: VLCStyle.dp(48, VLCStyle.scale)
         anchors.bottom: parent.bottom

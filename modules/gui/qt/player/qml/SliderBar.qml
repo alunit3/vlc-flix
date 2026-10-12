@@ -673,6 +673,34 @@ T.ProgressBar {
                 }
             }
         }
+
+        // flix: what the torrent has ready ahead of the playhead, drawn the way a video
+        // site does it: a lighter run from where playback is up to the end of the
+        // contiguous data, so it is obvious how far you can seek without waiting.
+        Rectangle {
+            id: torrentAhead
+
+            readonly property var stats: MainCtx.torrentStats
+            readonly property real total: Math.max(1, Number(stats.total ?? 0))
+            readonly property real played: control.visualPosition
+            readonly property real end: Math.max(played, Math.min(1,
+                (Number(stats.position ?? 0) + Number(stats.buffered ?? 0)) / total))
+            readonly property bool wanted: {
+                const where = String(MainCtx.flixPref("torrent/progressWhere", "both"))
+                return (where === "both" || where === "bar") && stats.total !== undefined
+            }
+
+            x: played * parent.width
+            width: Math.max(0, (end - played) * parent.width)
+            height: control.barHeight
+            radius: control._seekPointsRadius
+            color: theme.fg.neutral
+            opacity: 0.45
+            visible: wanted && control.visible && width > 0
+
+            Behavior on x { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+            Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+        }
     }
 
     Rectangle {

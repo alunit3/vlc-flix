@@ -42,6 +42,9 @@ class MLFoldersBaseModel : public QAbstractListModel
 {
     Q_OBJECT
     Q_PROPERTY(MainCtx* ctx READ getCtx WRITE setCtx NOTIFY ctxChanged FINAL)
+    // QML has no reliable way to observe an abstract list model's size, and the Home
+    // page needs to know when a folder it asked for actually arrived
+    Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
 
 public:
     enum Roles
@@ -78,6 +81,7 @@ public slots:
 
 signals:
     void ctxChanged();
+    void countChanged();
     void operationFailed( int op, QUrl url ) const;
     void onMLEntryPointModified(QPrivateSignal);
 

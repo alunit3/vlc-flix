@@ -31,6 +31,8 @@ Item {
 
     // the user pressed "More Info" on a slide: {id, title, duration, thumbnail}
     signal infoRequested(var item)
+    // a slide made from a "continue watching" entry (model role `entryKey`) was played
+    signal resumeEntry(string key)
 
     implicitHeight: VLCStyle.dp(440, VLCStyle.scale)
     visible: view.count > 0
@@ -243,7 +245,9 @@ Item {
                         id: playTap
 
                         onTapped: {
-                            if (slide.model.id !== undefined) {
+                            if (slide.model.entryKey) {
+                                root.resumeEntry(slide.model.entryKey)
+                            } else if (slide.model.id !== undefined) {
                                 const p = slide.model.progress ?? 0
                                 MediaLib.addAndPlay(slide.model.id)
                                 MainCtx.resumeFraction = (p > 0.03 && p < 0.95) ? p : (p > 0 ? -1 : 0)
@@ -256,6 +260,8 @@ Item {
 
                 Rectangle {
                     id: infoButton
+
+                    visible: !slide.model.entryKey
 
                     width: infoRow.implicitWidth + 2 * VLCStyle.dp(24, VLCStyle.scale)
                     height: VLCStyle.dp(44, VLCStyle.scale)

@@ -181,6 +181,12 @@ vlc_player_UpdateMLStates(vlc_player_t *player, struct vlc_player_input* input)
     input_item_t* item = input_GetItem(input->thread);
     if (!item)
         return;
+    /* flix: a torrent being streamed is served by a helper on a throw-away local port
+     * (http://127.0.0.1:<port>/<file>). Every stream would otherwise become a new
+     * "stream.mkv" in the media library history, with no title and no way back to it.
+     * VLCFlix keeps its own resume list for these. */
+    if (item->psz_uri != NULL && !strncmp(item->psz_uri, "http://127.0.0.1:", 17))
+        return;
     vlc_ml_media_t* media = vlc_ml_get_media_by_mrl(ml, item->psz_uri);
     if (!media)
     {

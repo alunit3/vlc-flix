@@ -204,6 +204,38 @@ local function genre_names(list)
     return names
 end
 
+-- age certification ("PG-13", "16", "TV-MA"...) out of release_dates (movies) / content_ratings
+-- (tv): the region of the synopsis language first, then the US, then anything there is
+function Service:certification(kind, d)
+    local list
+    if kind == "tv" then
+        list = type(d.content_ratings) == "table" and d.content_ratings.results
+    else
+        list = type(d.release_dates) == "table" and d.release_dates.results
+    end
+    if type(list) ~= "table" then return "" end
+    local function of(row)
+        if kind == "tv" then return tostring(row.rating or "") end
+        for _, rd in ipairs(row.release_dates or {}) do
+            if (rd.certification or "") ~= "" then return tostring(rd.certification) end
+        end
+        return ""
+    end
+    local regions = {}
+    local own = tostring(self.language or ""):match("%-(%u%u)$")
+    if own then regions[#regions + 1] = own end
+    regions[#regions + 1] = "US"
+    for _, region in ipairs(regions) do
+        for _, row in ipairs(list) do
+            if row.iso_3166_1 == region and of(row) ~= "" then return of(row) end
+        end
+    end
+    for _, row in ipairs(list) do
+        if of(row) ~= "" then return of(row) end
+    end
+    return ""
+end
+
 -- turns a /movie/{id} or /tv/{id} answer into the cache record
 function Service:record(kind, d)
     local runtime = tonumber(d.runtime)
@@ -224,6 +256,7 @@ function Service:record(kind, d)
         genres = genre_names(d.genres),
         runtime = runtime or 0,
         rating = tonumber(d.vote_average) or 0,
+        certification = self:certification(kind, d),
         imdb_id = d.imdb_id or ids.imdb_id or "",
         poster = self:image("posters", "w342", d.poster_path, kind .. id),
         backdrop = self:image("backdrops", "w780", d.backdrop_path, kind .. id),
@@ -268,7 +301,8 @@ function Service:lookup(req)
     local record
     if result then
         local d, e = self:get("/" .. kind .. "/" .. tostring(result.id),
-            { language = self.language, append_to_response = "external_ids" })
+            { language = self.language,
+              append_to_response = tv and "external_ids,content_ratings" or "external_ids,release_dates" })
         if not d then return nil, e end
         if (d.overview or "") == "" and self.language:sub(1, 2) ~= "en" then
             local en = self:get("/" .. kind .. "/" .. tostring(result.id), { language = "en-US" })
@@ -295,7 +329,8 @@ function Service:cached_detail(kind, id)
         return saved.data
     end
     local d = self:get("/" .. kind .. "/" .. tostring(id),
-        { language = self.language, append_to_response = "external_ids" })
+        { language = self.language,
+          append_to_response = kind == "tv" and "external_ids,content_ratings" or "external_ids,release_dates" })
     if d then
         write_file(path, json.encode({ language = self.language, fetched = now(), data = d }))
         return d
@@ -446,7 +481,8 @@ function Service:detail(req)
     local id = tonumber(req.tmdb_id)
     if not id then return nil, "bad_request" end
     local d, e = self:get("/" .. kind .. "/" .. tostring(math.floor(id)),
-        { language = self.language, append_to_response = "external_ids" })
+        { language = self.language,
+          append_to_response = kind == "tv" and "external_ids,content_ratings" or "external_ids,release_dates" })
     if not d then return nil, e end
     local record = self:record(kind, d)
     record.key = req.key

@@ -139,8 +139,11 @@ FocusScope {
             name: "discover",
             url: "qrc:///qt/qml/VLC/Network/DiscoverDisplay.qml"
         }, {
+            // flix: upstream's MLFoldersSettings.qml is not part of this build, and
+            // nothing could navigate to "mlsettings" anyway. The library folders live
+            // on the Settings page under VLCFlix > Storage.
             name: "mlsettings",
-            url: "qrc:///qt/qml/VLC/MediaLibrary/MLFoldersSettings.qml"
+            url: "qrc:///qt/qml/VLC/MediaLibrary/FlixSettingsPage.qml"
         }
     ]
 

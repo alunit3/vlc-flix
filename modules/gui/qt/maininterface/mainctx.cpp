@@ -49,6 +49,8 @@
 #include "playlist/playlist_controller.hpp"
 #include "player/player_controller.hpp"
 
+#include <vlc_input_item.h>
+
 #include "dialogs/dialogs_provider.hpp"
 #include "dialogs/systray/systray.hpp"
 
@@ -92,6 +94,7 @@
 #include <QDateTime>
 #include <QFileDialog>
 #include <QProcess>
+#include <QTimer>
 #include <QCoreApplication>
 #include <QSettings>
 #include <QRegularExpression>
@@ -559,8 +562,43 @@ void MainCtx::reloadPrefs()
 
 void MainCtx::onInputChanged( bool hasInput )
 {
+    // flix: torrent data is only really in use while our own stream is the thing
+    // playing. Ask the playlist rather than the helper process: the helper watches
+    // this process and stays alive until we stop it, so its existence says nothing.
+    const bool wasTorrentActive = m_torrentActive;
+    if( m_streamProc )
+        setTorrentActive( hasInput && playingTorrentStream() );
+
     if( hasInput == false )
+    {
+        /* The player let go of whatever it was playing. The torrent helper watches
+         * this process (not the player) to know when to quit, so it would otherwise
+         * outlive the stream and leave the storage page refusing to clear its data.
+         * Wait a moment first, because starting another title brings its own input and
+         * would otherwise cancel the stop.
+         *
+         * The generation is the *torrent* one, not the input one. It used to be bumped
+         * by every new input, which meant playing a local film in the two seconds after
+         * a stream ended cancelled the stop: the helper kept seeding and its data dir
+         * stayed put, so the storage page said "in use by the current stream" for a
+         * stream that had not run for hours. Only a new torrent should cancel this.
+         *
+         * Only arm the stop when it was the current torrent's own stream that ended.
+         * Switching torrents stops the old helper first, so the old stream fails and
+         * its input goes away *after* the new torrent has started: armed then, the
+         * stop would carry the new generation and kill the helper that was just
+         * launched, data folder and all. torrentStart() clears the active flag before
+         * that happens, which is what tells the two cases apart. */
+        if( wasTorrentActive )
+        {
+            const quint64 gen = m_torrentGeneration;
+            QTimer::singleShot( 2000, this, [this, gen]() {
+                if( m_torrentGeneration == gen && !playingTorrentStream() )
+                    stopTorrent();
+            } );
+        }
         return;
+    }
     int autoRaise = var_InheritInteger( p_intf, "qt-auto-raise" );
     if ( autoRaise == MainCtx::RAISE_NEVER )
         return;
@@ -572,6 +610,23 @@ void MainCtx::onInputChanged( bool hasInput )
     else if ( ( autoRaise & MainCtx::RAISE_AUDIO ) == 0 )
         return;
     emit askRaise();
+}
+
+// true when the item that is playing is the one the helper is serving
+bool MainCtx::playingTorrentStream() const
+{
+    PlayerController *pc = p_intf->p_mainPlayerController;
+    if( pc == nullptr )
+        return false;
+    input_item_t *input = pc->getInput();
+    if( input == nullptr )
+        return false;
+    char *uri = input_item_GetURI( input );
+    if( uri == nullptr )
+        return false;
+    const bool ours = strncmp( uri, "http://127.0.0.1", 16 ) == 0;
+    free( uri );
+    return ours;
 }
 
 #ifdef KeyPress
@@ -769,6 +824,7 @@ static QVariantMap metaRecordToMap( const QJsonObject &o, const QString &directo
     m.insert( QStringLiteral("tagline"), o.value( QStringLiteral("tagline") ).toString() );
     m.insert( QStringLiteral("runtime"), o.value( QStringLiteral("runtime") ).toInt() );
     m.insert( QStringLiteral("rating"), o.value( QStringLiteral("rating") ).toDouble() );
+    m.insert( QStringLiteral("certification"), o.value( QStringLiteral("certification") ).toString() );
     m.insert( QStringLiteral("imdbId"), o.value( QStringLiteral("imdb_id") ).toString() );
     m.insert( QStringLiteral("mediaType"), o.value( QStringLiteral("media_type") ).toString() );
     m.insert( QStringLiteral("tmdbId"), o.value( QStringLiteral("tmdb_id") ).toInt() );
@@ -780,7 +836,16 @@ static QVariantMap metaRecordToMap( const QJsonObject &o, const QString &directo
 
 QUrl MainCtx::pickFolder(const QString &title) const
 {
-    return QFileDialog::getExistingDirectoryUrl( nullptr, title, QUrl() );
+    QUrl url = QFileDialog::getExistingDirectoryUrl( nullptr, title, QUrl() );
+    if( !url.isValid() || url.isEmpty() )
+        return url;
+
+    // flix: the medialibrary wants a folder url that ends in a separator, which is not
+    // what the file dialog hands back. Without it the library refuses the folder and
+    // does so silently, so "Add movie folder" looked like it did nothing at all.
+    if( !url.path().endsWith( QLatin1Char('/') ) )
+        url.setPath( url.path() + QLatin1Char('/') );
+    return url;
 }
 
 QString MainCtx::torrentHelper() const
@@ -1108,6 +1173,84 @@ void MainCtx::saveTorrentResume(double fraction, int seconds, int length)
     emit resumeChanged();
 }
 
+static QString localResumeKey( const QString &mrl )
+{
+    // the library writes an address encoded, the player hands over a decoded one: same key for both
+    const QByteArray normal = QUrl( mrl ).toEncoded();
+    return QStringLiteral("f:") + QString::fromLatin1(
+        QCryptographicHash::hash( normal.isEmpty() ? mrl.toUtf8() : normal, QCryptographicHash::Sha1 ).toHex().left( 20 ) );
+}
+
+void MainCtx::importResume(const QString &mrl, const QString &name, double fraction, qint64 updated)
+{
+    if( mrl.isEmpty() || mrl.startsWith( QStringLiteral("http://127.0.0.1:") ) || fraction <= 0.03 || fraction >= 0.95 )
+        return;
+    const QString key = localResumeKey( mrl );
+    QVariantMap all = readResume();
+    if( all.contains( key ) )
+        return;
+    const QVariantMap info = releaseInfo( name );
+    const QVariantMap m = meta( name );
+    QVariantMap e;
+    e.insert( QStringLiteral("kind"), QStringLiteral("local") );
+    e.insert( QStringLiteral("mrl"), mrl );
+    const QString found = m.value( QStringLiteral("found") ).toBool() ? m.value( QStringLiteral("title") ).toString() : QString();
+    e.insert( QStringLiteral("title"), !found.isEmpty() ? found : info.value( QStringLiteral("title") ).toString() );
+    e.insert( QStringLiteral("poster"), m.value( QStringLiteral("poster") ) );
+    e.insert( QStringLiteral("mediaType"), info.value( QStringLiteral("isEpisode") ).toBool() ? QStringLiteral("tv") : QStringLiteral("movie") );
+    e.insert( QStringLiteral("season"), info.value( QStringLiteral("season") ) );
+    e.insert( QStringLiteral("episode"), info.value( QStringLiteral("episode") ) );
+    e.insert( QStringLiteral("fraction"), fraction );
+    e.insert( QStringLiteral("seconds"), 0 );
+    e.insert( QStringLiteral("length"), 0 );
+    e.insert( QStringLiteral("updated"), updated );
+    all.insert( key, e );
+    writeResume( all );
+    emit resumeChanged();
+}
+
+void MainCtx::clearResume()
+{
+    writeResume( QVariantMap() );
+    emit resumeChanged();
+}
+
+void MainCtx::saveLocalResume(const QString &mrl, const QString &name, double fraction, int seconds, int length)
+{
+    if( mrl.isEmpty() || length <= 0 )
+        return;
+    const QString key = localResumeKey( mrl );
+    QVariantMap all = readResume();
+    if( fraction > 0.95 )
+    {
+        if( !all.remove( key ) )
+            return;
+    }
+    else if( fraction > 0.03 )
+    {
+        const QVariantMap info = releaseInfo( name );
+        const QVariantMap m = meta( name );
+        QVariantMap e;
+        e.insert( QStringLiteral("kind"), QStringLiteral("local") );
+        e.insert( QStringLiteral("mrl"), mrl );
+        const QString found = m.value( QStringLiteral("found") ).toBool() ? m.value( QStringLiteral("title") ).toString() : QString();
+        e.insert( QStringLiteral("title"), !found.isEmpty() ? found : info.value( QStringLiteral("title") ).toString() );
+        e.insert( QStringLiteral("poster"), m.value( QStringLiteral("poster") ) );
+        e.insert( QStringLiteral("mediaType"), info.value( QStringLiteral("isEpisode") ).toBool() ? QStringLiteral("tv") : QStringLiteral("movie") );
+        e.insert( QStringLiteral("season"), info.value( QStringLiteral("season") ) );
+        e.insert( QStringLiteral("episode"), info.value( QStringLiteral("episode") ) );
+        e.insert( QStringLiteral("fraction"), fraction );
+        e.insert( QStringLiteral("seconds"), seconds );
+        e.insert( QStringLiteral("length"), length );
+        e.insert( QStringLiteral("updated"), QDateTime::currentSecsSinceEpoch() );
+        all.insert( key, e );
+    }
+    else
+        return;
+    writeResume( all );
+    emit resumeChanged();
+}
+
 // --- VLCFlix settings -----------------------------------------------------------------------
 
 static bool flixOptionAllowed( const QString &name )
@@ -1157,11 +1300,18 @@ bool MainCtx::setVlcOption(const QString &name, const QVariant &value)
     switch( config_GetType( n.constData() ) )
     {
         case VLC_VAR_STRING:
-            config_PutPsz( n.constData(), value.toString().trimmed().toUtf8().constData() );
+        {
+            // a password is kept exactly as typed; everything else loses stray spaces
+            const QString text = name == QLatin1String("flixsubs-password") ? value.toString()
+                                                                            : value.toString().trimmed();
+            config_PutPsz( n.constData(), text.toUtf8().constData() );
             break;
+        }
         case VLC_VAR_BOOL:
+            config_PutInt( n.constData(), value.toBool() ? 1 : 0 );
+            break;
         case VLC_VAR_INTEGER:
-            config_PutInt( n.constData(), value.toBool() ? 1 : ( value.toInt() ) );
+            config_PutInt( n.constData(), value.toLongLong() );
             break;
         default:
             return false;
@@ -1232,6 +1382,33 @@ QVariantMap MainCtx::setUserTrackers(const QString &text)
     return r;
 }
 
+// per-item options for a torrent stream.
+//
+// The stock http access gives the decoders one second of runway (network-caching). A
+// swarm takes longer than that to hand over the next piece, and an audio decoder that
+// runs out of buffer does not wait: it drops and resynchronises, which is the crackle
+// and the doubling. Four seconds covers an ordinary piece fetch with room to spare.
+// 0 in the settings leaves the default alone.
+QStringList MainCtx::torrentStreamOptions(const QString &title) const
+{
+    QStringList options;
+    if( !title.isEmpty() )
+        options << QStringLiteral("meta-title=") + title;
+    const int caching = flixPref( QStringLiteral("torrent/networkCaching"), 4000 ).toInt();
+    if( caching > 0 )
+        options << QStringLiteral("network-caching=%1").arg( caching );
+    return options;
+}
+
+// flix: the storage page used to refuse to clear the torrent data whenever the helper
+// process object still existed. The helper deliberately waits on this very process, so
+// that said nothing about whether anything was reading. Ask instead whether a stream
+// is really playing: a helper with no input behind it is not holding the files.
+bool MainCtx::torrentActive() const
+{
+    return m_torrentActive && m_streamProc != nullptr;
+}
+
 QStringList MainCtx::trackerArgs() const
 {
     const QString path = userFile( QStringLiteral("flix-trackers.txt") );
@@ -1249,6 +1426,16 @@ QStringList MainCtx::rateArgs() const
     if( up > 0 )
         args << QStringLiteral("--upload-rate-limit") << QString::number( up );
     return args;
+}
+
+// fetch only what the player is about to need ("stream"), or the whole file
+QStringList MainCtx::streamArgs() const
+{
+    const bool bStream = flixPref( QStringLiteral("torrent/streamOnly"), true ).toBool();
+    const qint64 window = flixPref( QStringLiteral("torrent/streamWindow"), 32 * 1024 * 1024 ).toLongLong();
+    return { bStream ? QStringLiteral("--stream-only=true")
+                     : QStringLiteral("--stream-only=false"),
+             QStringLiteral("--stream-window"), QString::number( window ) };
 }
 
 // --- storage --------------------------------------------------------------------------------
@@ -1323,8 +1510,14 @@ bool MainCtx::clearStorage(const QString &kind)
     // fixed folders under the user data folder only: nothing here comes from a path given by QML
     if( kind == QLatin1String("torrentData") )
     {
-        if( m_streamProc )
-            return false;                       // a stream is using the files
+        // A stream that is really playing holds these files. One that is not does not,
+        // and refusing there is what left the page saying "in use by the current
+        // stream" for a stream that had not run in hours: the check used to be "does
+        // the helper process exist", and the helper watches this very process and
+        // stays alive until we stop it. So an idle helper is simply stopped here.
+        if( torrentActive() )
+            return false;
+        stopTorrent();
         const QDir base( torrentDir() );
         for( const QString &d : base.entryList( { QStringLiteral("data-*"), QStringLiteral("files-*") }, QDir::Dirs | QDir::NoDotAndDotDot ) )
             QDir( base.filePath( d ) ).removeRecursively();
@@ -1342,6 +1535,8 @@ bool MainCtx::clearStorage(const QString &kind)
         return QDir( userFile( QStringLiteral("subtitles") ) ).removeRecursively();
     if( kind == QLatin1String("web") )
     {
+        // the web player is a separate window, so the helper existing is exactly the
+        // right test here - unlike the torrent, nothing plays it inside this process
         if( m_webProc )
             return false;
         return QDir( userFile( QStringLiteral("flix-web") ) ).removeRecursively();
@@ -1415,7 +1610,7 @@ void MainCtx::torrentSources(const QString &imdbId, int season, int episode)
 
 void MainCtx::stopTorrent()
 {
-    if( !m_streamProc )
+    if( !m_streamProc && !m_torrentActive && m_torrentDataDir.isEmpty() )
         return;
     msg_Dbg( p_intf, "flixtorrent: stopping the stream helper" );
     if( !m_torrentStats.isEmpty() )
@@ -1424,18 +1619,46 @@ void MainCtx::stopTorrent()
         emit torrentStatsChanged();
     }
     var_SetString( vlc_object_instance(p_intf), "flix-stream-info", "" );
+
     QProcess *proc = m_streamProc;
     m_streamProc = nullptr;
-    proc->disconnect( this );
-    // closing stdin tells the helper to quit and clean up; kill it if it does not
-    proc->closeWriteChannel();
-    proc->terminate();
-    if( !proc->waitForFinished( 800 ) )
+    setTorrentActive( false );
+    if( proc )
     {
-        proc->kill();
-        proc->waitForFinished( 1000 );
+        proc->disconnect( this );
+        // closing stdin tells the helper to quit and clean up; kill it if it does not
+        proc->closeWriteChannel();
+        proc->terminate();
+        if( !proc->waitForFinished( 800 ) )
+        {
+            proc->kill();
+            proc->waitForFinished( 1000 );
+        }
+        proc->deleteLater();
     }
-    proc->deleteLater();
+
+    // flix: the helper is killed, not asked to leave, so the os.RemoveAll in its own
+    // exit path never runs and the half-downloaded film stayed on disk. Doing it here
+    // means the storage page has something to clear and the next stream starts from
+    // an empty folder.
+    if( !m_torrentDataDir.isEmpty() )
+    {
+        QDir dir( m_torrentDataDir );
+        if( dir.exists() && !dir.removeRecursively() )
+            msg_Dbg( p_intf, "flixtorrent: could not remove %s", qtu( m_torrentDataDir ) );
+        m_torrentDataDir.clear();
+    }
+}
+
+// the flag the storage page watches. It is not the same as "the helper is running":
+// the helper watches this very process and stays alive until we stop it, so its
+// existence says nothing about whether the files are in use.
+void MainCtx::setTorrentActive( bool active )
+{
+    if( m_torrentActive == active )
+        return;
+    m_torrentActive = active;
+    emit torrentActiveChanged();
 }
 
 void MainCtx::torrentCancel()
@@ -1465,6 +1688,10 @@ void MainCtx::torrentStart(const QVariantMap &source)
     stopTorrent();
     m_streamBuffer.clear();
 
+    // a new torrent is starting, so any stop still pending from the previous one is
+    // now the wrong stop
+    ++m_torrentGeneration;
+
     // what the player needs to know about this stream: resume key, subtitle search info
     m_torrentSession = source;
     {
@@ -1482,6 +1709,7 @@ void MainCtx::torrentStart(const QVariantMap &source)
     const int fileIdx = source.value( QStringLiteral("fileIdx"), -1 ).toInt();
     const QString dataDir = torrentDir() + QStringLiteral("/data-")
                           + QString::number( QDateTime::currentSecsSinceEpoch() );
+    m_torrentDataDir = dataDir;
     m_streamProc = new QProcess( this );
     QProcess *proc = m_streamProc;
 
@@ -1543,6 +1771,7 @@ void MainCtx::torrentStart(const QVariantMap &source)
         if( m_streamProc != proc )
             return;
         m_streamProc = nullptr;
+        setTorrentActive( false );
         proc->deleteLater();
         if( code != 0 )
         {
@@ -1556,6 +1785,7 @@ void MainCtx::torrentStart(const QVariantMap &source)
         if( e != QProcess::FailedToStart || m_streamProc != proc )
             return;
         m_streamProc = nullptr;
+        setTorrentActive( false );
         proc->deleteLater();
         QVariantMap st;
         st.insert( QStringLiteral("state"), QStringLiteral("error") );
@@ -1580,6 +1810,7 @@ void MainCtx::torrentStart(const QVariantMap &source)
         args << QStringLiteral("--start-fraction") << QString::number( resumeAt, 'f', 4 );
     args << trackerArgs();
     args << rateArgs();
+    args << streamArgs();
     proc->start( torrentHelper(), args );
 }
 
@@ -1635,8 +1866,10 @@ QVariantMap MainCtx::meta(const QString &name)
         const QJsonObject o = QJsonDocument::fromJson( file.readAll() ).object();
         file.close();
         const qint64 age = QDateTime::currentSecsSinceEpoch() - qint64( o.value( QStringLiteral("fetched") ).toDouble() );
-        const bool stale = o.value( QStringLiteral("found") ).toBool() ? age > 14 * 86400
-                                                                          : age > 1 * 86400;
+        // records written before the age certification was fetched have no such field: refresh them
+        const bool stale = o.value( QStringLiteral("found") ).toBool()
+                         ? ( age > 14 * 86400 || !o.contains( QStringLiteral("certification") ) )
+                         : age > 1 * 86400;
         if( !o.isEmpty() )
         {
             // stale-while-revalidate: show what we have at once, refresh it in the background

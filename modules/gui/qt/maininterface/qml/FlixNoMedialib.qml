@@ -108,13 +108,44 @@ FocusScope {
 
                 text: qsTr("Open File")
 
-                // same width for both buttons, to keep the row symmetric
-                width: Math.max(fileButton.implicitWidth, discButton.implicitWidth)
+                // same width for the buttons, to keep the row symmetric
+                width: Math.max(fileButton.implicitWidth,
+                                Math.max(discButton.implicitWidth, folderButton.implicitWidth))
 
                 Navigation.parentItem: root
-                Navigation.rightItem: discButton
+                Navigation.rightItem: folderButton
 
                 onClicked: DialogsProvider.simpleOpenDialog()
+            }
+
+            // flix: this page used to offer only a file and a disc, so a user whose
+            // library had failed to open had no way to point at a folder at all - and
+            // "Add movie folder" is how the library gets its first entry
+            Widgets.ActionButtonPrimary {
+                id: folderButton
+
+                AccessibleCompat.id: "addFolderButton"
+
+                text: qsTr("Add movie folder")
+
+                width: Math.max(fileButton.implicitWidth,
+                                Math.max(discButton.implicitWidth, folderButton.implicitWidth))
+
+                Navigation.parentItem: root
+                Navigation.leftItem: fileButton
+                Navigation.rightItem: discButton
+
+                onClicked: {
+                    // there is no library to add it to, so say so rather than
+                    // appearing to work and adding nothing
+                    noFolderHint.visible = false
+                    const folder = MainCtx.pickFolder(qsTr("Choose the folder with your movies and series"))
+                    if (folder.toString() !== "") {
+                        noFolderHint.text = qsTr("%1 will be added to the library the next time VLCFlix starts.")
+                                       .arg(folder.toString().replace(/%20/g, " "))
+                        noFolderHint.visible = true
+                    }
+                }
             }
 
             Widgets.ActionButtonPrimary {
@@ -124,13 +155,25 @@ FocusScope {
 
                 text: qsTr("Open Disc")
 
-                width: Math.max(fileButton.implicitWidth, discButton.implicitWidth)
+                width: Math.max(fileButton.implicitWidth,
+                                Math.max(discButton.implicitWidth, folderButton.implicitWidth))
 
                 Navigation.parentItem: root
-                Navigation.leftItem: fileButton
+                Navigation.leftItem: folderButton
 
                 onClicked: DialogsProvider.openDiscDialog()
             }
+        }
+
+        Text {
+            id: noFolderHint
+
+            visible: false
+            width: parent.width
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+            color: theme.fg.secondary
+            font.pixelSize: VLCStyle.dp(12, VLCStyle.scale)
         }
     }
 }

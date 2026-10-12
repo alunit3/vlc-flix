@@ -18,6 +18,7 @@
 import QtQuick
 
 import VLC.MainInterface
+import VLC.MediaLibrary
 import VLC.Style
 
 // VLCFlix settings: accounts, library, subtitles, playback, torrents, storage. These are VLCFlix's
@@ -53,6 +54,10 @@ Item {
     property bool hideCam: true
     property string rateDown: "0"
     property string rateUp: "0"
+    property bool streamOnly: true
+    property string streamWindow: "33554432"
+    property string networkCaching: "4000"
+    property string progressWhere: "both"
 
     // speed caps in bytes/s, "0" being unlimited; the chips are the usual picks, the
     // fields next to them take anything else in KB/s
@@ -92,6 +97,10 @@ Item {
         rateUp = String(MainCtx.flixPref("torrent/rateUp", 0))
         rateDownField.text = _kb(rateDown)
         rateUpField.text = _kb(rateUp)
+        streamOnly = String(MainCtx.flixPref("torrent/streamOnly", true)) !== "false"
+        streamWindow = String(MainCtx.flixPref("torrent/streamWindow", 33554432))
+        networkCaching = String(MainCtx.flixPref("torrent/networkCaching", 4000))
+        progressWhere = String(MainCtx.flixPref("torrent/progressWhere", "both"))
         tmdbStatus = ""
         osStatus = ""
         message = ""
@@ -145,7 +154,11 @@ Item {
         }
         confirming = ""
         const ok = MainCtx.clearStorage(kind)
-        message = ok ? qsTr("Cleared.") : qsTr("Stop the running stream or web player first.")
+        // A refused clear means something is genuinely playing out of these files now,
+        // which is a different answer from the one this used to give in every case.
+        message = ok ? qsTr("Cleared.")
+                     : (kind === "torrentData" ? qsTr("A torrent is playing right now. Stop it and try again.")
+                                               : qsTr("The web player is running. Close it and try again."))
         refreshStorage()
     }
 
@@ -227,6 +240,13 @@ Item {
     Connections {
         target: MainCtx
 
+        // a stream starting or stopping changes whether the torrent data can be cleared,
+        // and the sizes change with it
+        function onTorrentActiveChanged() {
+            if (storage.length > 0)
+                root.refreshStorage()
+        }
+
         // the answer of the Lua service; a good account is kept right away
         function onAccountTestResult(kind, ok, text) {
             if (kind === "tmdb") {
@@ -291,6 +311,14 @@ Item {
     }
 
     // ---- small building blocks -------------------------------------------------------------
+    property bool confirmClearWatching: false
+
+    MLRecentMediaModel {
+        id: recentsForClear
+
+        ml: MediaLib
+    }
+
     component Btn: Rectangle {
         id: btn
 
@@ -878,6 +906,32 @@ Item {
                     onToggled: (value) => { root.showHud = value; MainCtx.setFlixPref("torrent/hud", value ? "shown" : "hidden") }
                 }
 
+                // forget what is in "Continue Watching" on Home (never touches the files themselves)
+                Row {
+                    spacing: VLCStyle.dp(12, VLCStyle.scale)
+
+                    Btn {
+                        text: root.confirmClearWatching ? qsTr("Yes, clear it") : qsTr("Clear Continue Watching")
+                        danger: root.confirmClearWatching
+                        onClicked: {
+                            if (!root.confirmClearWatching) {
+                                root.confirmClearWatching = true
+                                return
+                            }
+                            root.confirmClearWatching = false
+                            MainCtx.setFlixPref("resume/imported", "1")
+                            MainCtx.clearResume()
+                            recentsForClear.clearHistory()
+                        }
+                    }
+
+                    Btn {
+                        visible: root.confirmClearWatching
+                        text: qsTr("Cancel")
+                        onClicked: root.confirmClearWatching = false
+                    }
+                }
+
                 Note {
                     text: qsTr("Continue watching is automatic: VLCFlix remembers where you stopped (library files, torrents and online players) and offers \"Start over\" when it resumes.")
                 }
@@ -917,6 +971,48 @@ Item {
                     label: qsTr("Hide CAM and telesync releases")
                     checked: root.hideCam
                     onToggled: (value) => { root.hideCam = value; MainCtx.setFlixPref("picker/hideCam", value) }
+                }
+
+                Rectangle { width: parent.width; height: 1; color: "#333333" }
+
+                Choice {
+                    label: qsTr("How much to download")
+                    hint: qsTr("Stream fetches only what the player is about to need and keeps nothing beyond it, so a film is never downloaded ahead of you. Download gets the whole file and keeps it on disk. Read when a stream starts.")
+                    current: root.streamOnly ? "stream" : "download"
+                    options: [{ value: "stream", text: qsTr("Stream (buffer only)") },
+                              { value: "download", text: qsTr("Download the whole film") }]
+                    onPicked: (value) => {
+                        root.streamOnly = value === "stream"
+                        MainCtx.setFlixPref("torrent/streamOnly", root.streamOnly)
+                    }
+                }
+
+                Choice {
+                    label: qsTr("How far ahead to buffer")
+                    visible: root.streamOnly
+                    hint: qsTr("A bigger buffer rides out a slow connection but holds more of the film on disk. Leave it alone unless playback stalls.")
+                    current: root.streamWindow
+                    options: [{ value: "8388608", text: "8 MB" }, { value: "33554432", text: "32 MB" },
+                              { value: "134217728", text: "128 MB" }]
+                    onPicked: (value) => { root.streamWindow = value; MainCtx.setFlixPref("torrent/streamWindow", Number(value)) }
+                }
+
+                Choice {
+                    label: qsTr("Player buffer")
+                    hint: qsTr("How much playback to hold in memory before starting. A torrent hands over its data a piece at a time, so this needs to be longer than the stock one second or the audio runs dry and crackles. Raise it if a slow swarm still stutters; 0 leaves the player default alone.")
+                    current: root.networkCaching
+                    options: [{ value: "0", text: qsTr("Player default") }, { value: "4000", text: "4 s" },
+                              { value: "8000", text: "8 s" }, { value: "15000", text: "15 s" }]
+                    onPicked: (value) => { root.networkCaching = value; MainCtx.setFlixPref("torrent/networkCaching", Number(value)) }
+                }
+
+                Choice {
+                    label: qsTr("Show the download progress")
+                    hint: qsTr("In the seek bar it is the lighter run ahead of the playhead, like on a video site. In the stats box it is a percentage and a bar next to the speeds.")
+                    current: root.progressWhere
+                    options: [{ value: "both", text: qsTr("Both") }, { value: "bar", text: qsTr("Seek bar only") },
+                              { value: "hud", text: qsTr("Stats box only") }, { value: "none", text: qsTr("Nowhere") }]
+                    onPicked: (value) => { root.progressWhere = value; MainCtx.setFlixPref("torrent/progressWhere", value) }
                 }
 
                 Rectangle { width: parent.width; height: 1; color: "#333333" }
@@ -1042,7 +1138,10 @@ Item {
 
                         required property var modelData
 
-                        readonly property bool inUse: (modelData.kind === "torrentData" && MainCtx.torrentRunning())
+                        // flix: this used to be a Q_INVOKABLE pull with no notify signal, so the label and the
+                // disabled button were only recomputed when the page was opened. torrentActive
+                // is a real property that changes when a stream starts or stops, so both follow.
+                readonly property bool inUse: (modelData.kind === "torrentData" && MainCtx.torrentActive)
 
                         width: col0.width
                         height: VLCStyle.dp(52, VLCStyle.scale)

@@ -159,11 +159,16 @@ Item {
         }
 
         function onTorrentStatus(status) {
-            if (!root.shown || !root.streaming)
-                return
+            // flix: "ready" must be acted on even when the dialog is not on screen.
+            // It used to be dropped whenever the dialog had been closed in the seconds
+            // between starting the stream and it being ready, and nothing was ever
+            // played: the helper kept seeding, its data dir stayed, and the storage page
+            // then refused to clear it as "in use by the current stream" for a stream
+            // that had never started. Closing the dialog cancels the stream through
+            // close(), so a dialog that is not shown has nothing to cancel either.
             if (status.state === "ready") {
                 root.handedOver = true
-                MediaLib.addAndPlay(status.url, ["meta-title=" + root.displayTitle])
+                MediaLib.addAndPlay(status.url, MainCtx.torrentStreamOptions(root.displayTitle))
                 MainCtx.resumeFraction = MainCtx.torrentResume()
                 MainCtx.resumeNotice = 0
                 MainCtx.playerView = true
@@ -172,6 +177,8 @@ Item {
                 root.streamStarted()
                 return
             }
+            if (!root.shown || !root.streaming)
+                return
             root.stream = Object.assign({}, root.stream ?? {}, status)
         }
     }

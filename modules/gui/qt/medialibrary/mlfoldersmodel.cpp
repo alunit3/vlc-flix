@@ -155,6 +155,7 @@ void MLFoldersBaseModel::updateImpl(vlc_ml_folder_list_t* (*folderListFunc)( vlc
         m_mrls = std::move(ctx.r);
         m_updatePending = false;
         endResetModel();
+        emit countChanged();
     });
 }
 
@@ -191,13 +192,34 @@ void MLFoldersModel::remove( const QUrl &mrl )
     ML_FOLDER_ADD_QUEUE);
 }
 
-void MLFoldersModel::add(const QUrl &mrl )
+void MLFoldersModel::add(const QUrl &mrlIn )
 {
+    // flix: "Add movie folder" reported nothing at all when the library refused the
+    // folder. Two reasons, both fixed here.
+    //
+    // First, the medialibrary needs the entry point to end with a separator - see
+    // networkmediamodel.cpp, which says so and appends one. The folder picker hands
+    // back a url without one, and a folder url without it is not a folder.
+    //
+    // Second, the return of vlc_ml_add_folder() used to be thrown away. Some refusals
+    // (the library failing to open, for one) produce no event at all, so the only way
+    // for QML to hear about them is this return value.
+    QUrl mrl = mrlIn;
+    if( mrl.isValid() && !mrl.path().endsWith( QLatin1Char('/') ) )
+        mrl.setPath( mrl.path() + QLatin1Char('/') );
+
+    struct Ctx { bool added; };
+
     //UI data is updated on onMlEvent
-    m_mediaLib->runOnMLThread(this,
+    m_mediaLib->runOnMLThread<Ctx>(this,
     //ML thread
-    [mrl](vlc_medialibrary_t* ml){
-        vlc_ml_add_folder( ml, qtu( mrl.toString( QUrl::FullyEncoded ) ) );
+    [mrl](vlc_medialibrary_t* ml, Ctx& ctx){
+        ctx.added = vlc_ml_add_folder( ml, qtu( mrl.toString( QUrl::FullyEncoded ) ) ) == VLC_SUCCESS;
+    },
+    //UI thread
+    [this, mrl](quint64, Ctx& ctx){
+        if( !ctx.added )
+            emit operationFailed( Add, mrl );
     },
     ML_FOLDER_ADD_QUEUE);
 }

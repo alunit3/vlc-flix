@@ -102,18 +102,28 @@ Rectangle {
         return u.indexOf("http://127.0.0.1:") === 0 && MainCtx.torrentSession.resumeKey !== undefined
     }
 
+    // a video file on this computer: "Continue Watching" on the Home page
+    readonly property bool isLocalVideo: !isTorrentStream && Player.hasVideoOutput
+                                         && Player.url.toString().indexOf("file:") === 0
+
     function saveTorrentPosition() {
-        if (!isTorrentStream)
-            return
         const total = Player.length.toSeconds()
-        if (total > 60)
+        if (total <= 60)
+            return
+        if (isTorrentStream)
             MainCtx.saveTorrentResume(Player.position, Math.round(Player.position * total), Math.round(total))
+        else if (isLocalVideo)
+            MainCtx.saveLocalResume(Player.url.toString(), Player.title || Player.name,
+                                    Player.position, Math.round(Player.position * total), Math.round(total))
     }
+
+    // also called by Player.qml right before it stops the video
+    function saveNow() { saveTorrentPosition() }
 
     Timer {
         interval: 5000
         repeat: true
-        running: root.isTorrentStream && Player.playingState === Player.PLAYING_STATE_PLAYING
+        running: (root.isTorrentStream || root.isLocalVideo) && Player.playingState === Player.PLAYING_STATE_PLAYING
         onTriggered: root.saveTorrentPosition()
     }
 
@@ -121,7 +131,8 @@ Rectangle {
         target: Player
 
         function onPlayingStateChanged() {
-            if (Player.playingState === Player.PLAYING_STATE_PAUSED)
+            if (Player.playingState === Player.PLAYING_STATE_PAUSED
+                    || Player.playingState === Player.PLAYING_STATE_STOPPING)
                 root.saveTorrentPosition()
         }
     }

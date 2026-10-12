@@ -23,7 +23,8 @@ import VLC.Playlist
 import VLC.Style
 
 // flix: shown when the video has been paused for a few seconds without any mouse
-// activity: "You're watching" / title / season + episode, "Paused" in the corner.
+// activity: "You're watching", the title, "year  rating  runtime", the synopsis and "Paused"
+// in the corner.
 // Player.qml calls activity() on every mouse event, which hides the screen again.
 Item {
     id: root
@@ -39,8 +40,8 @@ Item {
             idleTimer.restart()
     }
 
-    readonly property string display: MainCtx.cleanTitle(Player.title || Player.name)
-    readonly property var episode: display.match(/^(.*) - S(\d+)E(\d+)$/)
+    // what is playing (FlixNowPlaying.qml), set by Player.qml
+    property var np: null
 
     visible: opacity > 0
     opacity: armed ? 1.0 : 0.0
@@ -49,32 +50,12 @@ Item {
         NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
     }
 
-    // TMDB synopsis of what is playing (asked for as soon as the video is paused)
-    property var meta: ({})
-    readonly property string overview: meta.overview ?? ""
-
-    function refreshMeta() {
-        const name = Player.title || Player.name
-        meta = name !== "" ? MainCtx.meta(name) : ({})
-    }
-
-    Connections {
-        target: MainCtx
-
-        function onMetaUpdated(key) {
-            if (root.paused && !root.overview)
-                root.refreshMeta()
-        }
-    }
-
     onPausedChanged: {
         armed = false
-        if (paused) {
-            refreshMeta()
+        if (paused)
             idleTimer.restart()
-        } else {
+        else
             idleTimer.stop()
-        }
     }
 
     // wait a few seconds so pausing for a moment does not flash the screen
@@ -105,7 +86,7 @@ Item {
 
         Text {
             width: parent.width
-            text: root.episode ? root.episode[1] : root.display
+            text: root.np ? root.np.title : ""
             color: "#FFFFFF"
             font.pixelSize: VLCStyle.dp(52, VLCStyle.scale)
             font.weight: Font.Bold
@@ -114,33 +95,42 @@ Item {
             elide: Text.ElideRight
         }
 
-        // synopsis from TMDB, directly under the title
+        // year, age rating, runtime (episodes: season and episode first)
+        Row {
+            spacing: VLCStyle.dp(22, VLCStyle.scale)
+            visible: root.np !== null && (root.np.episode !== null || root.np.year > 0
+                                           || root.np.ageText !== "" || root.np.runtimeText !== "")
+
+            Repeater {
+                model: root.np ? [
+                    root.np.episode ? qsTr("Season %1").arg(Number(root.np.episode[2])) : "",
+                    root.np.episode ? qsTr("Episode %1").arg(Number(root.np.episode[3])) : "",
+                    root.np.year > 0 ? String(root.np.year) : "",
+                    root.np.ageText,
+                    root.np.runtimeText
+                ] : []
+
+                Text {
+                    visible: modelData !== ""
+                    text: modelData
+                    color: "#FFFFFF"
+                    font.pixelSize: VLCStyle.dp(22, VLCStyle.scale)
+                    font.weight: Font.Bold
+                }
+            }
+        }
+
+        // synopsis from TMDB, directly under the line above
         Text {
-            visible: root.overview !== ""
+            visible: text !== ""
             width: Math.min(parent.width, VLCStyle.dp(640, VLCStyle.scale))
-            text: root.overview
+            text: root.np ? root.np.overview : ""
             color: "#D2D2D2"
             font.pixelSize: VLCStyle.dp(18, VLCStyle.scale)
             lineHeight: 1.15
             wrapMode: Text.WordWrap
             maximumLineCount: 5
             elide: Text.ElideRight
-        }
-
-        Text {
-            visible: root.episode !== null
-            text: root.episode ? qsTr("Season %1").arg(Number(root.episode[2])) : ""
-            color: "#FFFFFF"
-            font.pixelSize: VLCStyle.dp(26, VLCStyle.scale)
-            font.weight: Font.Bold
-        }
-
-        Text {
-            visible: root.episode !== null
-            text: root.episode ? qsTr("Episode %1").arg(Number(root.episode[3])) : ""
-            color: "#E5E5E5"
-            font.pixelSize: VLCStyle.dp(22, VLCStyle.scale)
-            font.weight: Font.DemiBold
         }
     }
 

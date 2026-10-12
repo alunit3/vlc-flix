@@ -178,11 +178,12 @@ Item {
         }
 
         function onTorrentStatus(status) {
-            if (!root.shown)
-                return
+            // flix: see FlixMagnetDialog - "ready" is acted on whether or not the picker
+            // is on screen. Dropping it left the helper running with nothing playing it,
+            // and the storage page then called that "in use by the current stream".
             if (status.state === "ready") {
                 root.handedOver = true
-                MediaLib.addAndPlay(status.url, ["meta-title=" + root.displayTitle])
+                MediaLib.addAndPlay(status.url, MainCtx.torrentStreamOptions(root.displayTitle))
                 MainCtx.resumeFraction = MainCtx.torrentResume()
                 MainCtx.resumeNotice = 0
                 MainCtx.playerView = true
@@ -191,6 +192,8 @@ Item {
                 root.streamStarted()
                 return
             }
+            if (!root.shown)
+                return
             if (status.state === "progress" || status.state === "connecting" || status.state === "metadata"
                     || status.state === "error" || status.state === "cancelled")
                 root.stream = Object.assign({}, root.stream ?? {}, status)

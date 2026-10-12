@@ -1195,6 +1195,8 @@ libqml_module_player_a_QML = \
 	player/qml/PIPPlayer.qml \
 	player/qml/FlixPauseOverlay.qml \
 	player/qml/FlixBackButton.qml \
+	player/qml/FlixNowPlaying.qml \
+	player/qml/FlixRatingBanner.qml \
 	player/qml/FlixResumeToast.qml \
 	player/qml/FlixTorrentStats.qml \
 	player/qml/FlixSubOffer.qml \
@@ -1556,6 +1558,13 @@ libqt_plugin_la_SOURCES += $(libqt_plugin_la_SHADER)
 CLEANFILES += shaders/shaders.qrc
 
 lib_qt_plugin_la_QRC = assets.qrc
+
+# assets.qrc pulls the window and tray icons in from share/icons, which sits outside
+# this directory and so is not covered by the resource list. Listing them here is
+# enough to make assets.cpp go out of date when an icon changes, instead of the old
+# artwork being kept. Do not add them to the assets.cpp rule itself: its recipe passes
+# the first prerequisite straight to rcc, which would then try to parse the icon.
+assets.qrc: $(top_srcdir)/share/icons/vlc.ico
 
 if HAVE_WIN32
 lib_qt_plugin_la_QRC += windows.qrc

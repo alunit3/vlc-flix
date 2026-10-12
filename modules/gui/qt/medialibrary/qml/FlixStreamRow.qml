@@ -20,8 +20,8 @@ import QtQuick
 import VLC.MainInterface
 import VLC.Style
 
-// flix: "Continue Streaming": torrent streams and web players that were stopped part way
-// (the positions are kept by MainCtx, see resumeList()).
+// flix: "Continue Streaming" (torrent streams and web players) and "Continue Watching" (files on
+// this computer) that were stopped part way; the positions are kept by MainCtx, see resumeList().
 Item {
     id: root
 
@@ -30,11 +30,19 @@ Item {
     // card clicked: continue a torrent / open the title of a web player
     signal resumeTorrent(var entry)
     signal resumeWeb(var entry)
+    signal resumeLocal(var entry)
+    // the user confirmed "Clear" (the page also clears the library's own history)
+    signal clearRequested()
+
+    // which entries this row shows, and what it is called
+    property var kinds: ["local", "torrent", "web"]
+    property string title: qsTr("Continue Watching")
+    property bool confirmClear: false
 
     property int tick: 0
     readonly property var entries: {
         tick
-        return MainCtx.resumeList()
+        return MainCtx.resumeList().filter(e => root.kinds.indexOf(e.kind) >= 0)
     }
 
     Connections {
@@ -51,12 +59,57 @@ Item {
         id: header
 
         x: root.sideMargin
-        text: qsTr("Continue Streaming")
+        text: root.title
         color: "#E5E5E5"
         font.pixelSize: VLCStyle.dp(20, VLCStyle.scale)
         font.weight: Font.DemiBold
         height: implicitHeight + VLCStyle.dp(12, VLCStyle.scale)
         verticalAlignment: Text.AlignTop
+    }
+
+    // "Clear" with an inline question: nothing is forgotten without a second click
+    Row {
+        anchors.right: parent.right
+        anchors.rightMargin: root.sideMargin
+        anchors.verticalCenter: header.verticalCenter
+        anchors.verticalCenterOffset: -VLCStyle.dp(6, VLCStyle.scale)
+        spacing: VLCStyle.dp(14, VLCStyle.scale)
+
+        Text {
+            visible: root.confirmClear
+            anchors.verticalCenter: parent.verticalCenter
+            text: qsTr("Clear Continue Watching?")
+            color: "#B3B3B3"
+            font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
+        }
+
+        Text {
+            visible: root.confirmClear
+            anchors.verticalCenter: parent.verticalCenter
+            text: qsTr("Yes, clear")
+            color: yesHover.hovered ? "#FFFFFF" : "#E5E5E5"
+            font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
+            font.weight: Font.Bold
+            font.underline: true
+
+            HoverHandler { id: yesHover; cursorShape: Qt.PointingHandCursor }
+            TapHandler {
+                onTapped: {
+                    root.confirmClear = false
+                    root.clearRequested()
+                }
+            }
+        }
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.confirmClear ? qsTr("Cancel") : qsTr("Clear")
+            color: clearHover.hovered ? "#FFFFFF" : "#B3B3B3"
+            font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
+
+            HoverHandler { id: clearHover; cursorShape: Qt.PointingHandCursor }
+            TapHandler { onTapped: root.confirmClear = !root.confirmClear }
+        }
     }
 
     ListView {
@@ -119,6 +172,7 @@ Item {
 
                 // kind badge
                 Rectangle {
+                    visible: card.modelData.kind !== "local"
                     anchors.left: parent.left
                     anchors.top: parent.top
                     anchors.margins: VLCStyle.dp(6, VLCStyle.scale)
@@ -200,6 +254,8 @@ Item {
                         return
                     if (card.modelData.kind === "torrent")
                         root.resumeTorrent(card.modelData)
+                    else if (card.modelData.kind === "local")
+                        root.resumeLocal(card.modelData)
                     else
                         root.resumeWeb(card.modelData)
                 }

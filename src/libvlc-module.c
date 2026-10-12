@@ -2256,6 +2256,11 @@ vlc_module_begin ()
     add_module_list_cat("extraintf", SUBCAT_INTERFACE_MAIN, "luaintf",
                         EXTRAINTF_TEXT, EXTRAINTF_LONGTEXT)
 
+    /* flix: stop "Subtitle slave added" being written over the picture when a
+     * subtitle is attached. VLCFlix says so itself, in its own window. */
+    add_bool( "flix-no-sub-slave-osd", true, NULL, NULL )
+        change_safe()
+
 
     set_subcategory( SUBCAT_INTERFACE_CONTROL )
     add_module_list_cat("control", SUBCAT_INTERFACE_CONTROL, NULL,

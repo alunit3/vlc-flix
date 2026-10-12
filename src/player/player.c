@@ -1189,7 +1189,13 @@ vlc_player_AddAssociatedMedia(vlc_player_t *player,
     if (ret != VLC_SUCCESS)
         return ret;
 
-    if (notify)
+    /* flix: the "Subtitle slave added" OSD lands on top of the picture every time a
+     * subtitle is attached, and VLCFlix already tells the user in its own window what
+     * it did (the online subtitle service names the language and the release). The
+     * callers that could reach this with notify true were already changed to ask for
+     * no notification; this is the backstop, so the message cannot come back through
+     * some other front end. */
+    if (notify && !var_InheritBool(player, "flix-no-sub-slave-osd"))
     {
         switch( type )
         {

@@ -2250,7 +2250,10 @@ void PlayerController::refreshMediaMeta( input_item_t *p_item )
 
 bool PlayerController::associateSubtitleFile(const QString &uri)
 {
-    return AddAssociatedMedia(SPU_ES, uri, true, true, true) == VLC_SUCCESS;
+    // flix: notify false. It draws "Subtitle slave added" over the picture, and VLCFlix
+    // already says what it did in its own words when the subtitle comes from the online
+    // service. On a drag-and-drop the message says nothing the drop did not.
+    return AddAssociatedMedia(SPU_ES, uri, true, false, true) == VLC_SUCCESS;
 }
 
 int PlayerController::AddAssociatedMedia(es_format_category_e cat, const QString &uri, bool select, bool notify, bool check_ext)

@@ -657,7 +657,10 @@ static int vlclua_input_add_subtitle(lua_State *L, bool b_path)
 
     const char *uri = b_path ? mrl : sub;
     vlc_player_Lock(player);
-    vlc_player_AddAssociatedMedia(player, SPU_ES, uri, autoselect, true, false);
+    /* notify stays false: VLCFlix adds subtitles itself and says so in its own
+     * window, so the "Subtitle slave added" OSD flashing over the picture is only
+     * noise. Note that the Lua argument is "autoselect", not the OSD flag. */
+    vlc_player_AddAssociatedMedia(player, SPU_ES, uri, autoselect, false, false);
     vlc_player_Unlock(player);
     if (b_path)
         free(mrl);

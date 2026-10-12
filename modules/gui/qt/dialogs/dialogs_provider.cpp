@@ -989,8 +989,11 @@ void  DialogsProvider::loadMediaFile( const es_format_category_e category, const
 
     foreach( const QString &qsUrl, qsl )
     {
-
-        if ( THEMIM->AddAssociatedMedia( category, qsUrl, true, true, false ) )
+        // flix: notify false for subtitles. It draws "Subtitle slave added" over the
+        // picture, which is only noise here - and for a subtitle loaded through the
+        // online service, the service has already said so in its own window.
+        const bool notify = ( category != SPU_ES );
+        if ( THEMIM->AddAssociatedMedia( category, qsUrl, true, notify, false ) )
             msg_Warn( p_intf, "unable to load media from '%s', category(%d)", qtu( qsUrl ), category );
     }
 }

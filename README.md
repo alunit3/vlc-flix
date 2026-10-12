@@ -144,6 +144,8 @@ a draft release with the installer, the zip and `SHA256SUMS`.
 - This product uses the TMDB API but is not endorsed or certified by TMDB.
 - Not affiliated with VideoLAN or Netflix. "VLC" and the cone are trademarks of VideoLAN.
 - Third-party code and services are listed in [`flix/NOTICE.md`](flix/NOTICE.md).
+- The player screenshots show [Sintel](https://durian.blender.org/) (© Blender Foundation,
+  CC BY 3.0); posters and backdrops in the others come from TMDB.
 
 ## License
 

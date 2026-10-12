@@ -236,10 +236,6 @@ static HRESULT Play(aout_stream_t *s, block_t *block, vlc_tick_t date)
     if (sys->first_pts == VLC_TICK_INVALID)
         sys->first_pts = block->i_pts;
 
-    if (sys->chans_to_reorder)
-        aout_ChannelReorder(block->p_buffer, block->i_buffer,
-                          sys->chans_to_reorder, sys->chans_table, sys->format);
-
     hr = IAudioClient_GetService(sys->client, &IID_IAudioRenderClient, &pv);
     if (FAILED(hr))
     {
@@ -272,6 +268,15 @@ static HRESULT Play(aout_stream_t *s, block_t *block, vlc_tick_t date)
         }
 
         const size_t copy = frames * sys->block_align;
+
+        /* Reorder only what is written now: a block that does not fit is kept
+         * and played again from its remainder, which must not be reordered
+         * twice. */
+        if (sys->chans_to_reorder && frames > 0)
+            aout_ChannelReorder(block->p_buffer,
+                                frames * (block->i_buffer / block->i_nb_samples),
+                                sys->chans_to_reorder, sys->chans_table,
+                                sys->format);
 
         if (!sys->s24s32)
         {

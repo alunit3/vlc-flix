@@ -57,6 +57,7 @@ Item {
     property bool streamOnly: true
     property string streamWindow: "33554432"
     property string networkCaching: "4000"
+    property string keepBytes: "21474836480"
     property string progressWhere: "both"
 
     // speed caps in bytes/s, "0" being unlimited; the chips are the usual picks, the
@@ -100,6 +101,7 @@ Item {
         streamOnly = String(MainCtx.flixPref("torrent/streamOnly", true)) !== "false"
         streamWindow = String(MainCtx.flixPref("torrent/streamWindow", 33554432))
         networkCaching = String(MainCtx.flixPref("torrent/networkCaching", 4000))
+        keepBytes = String(MainCtx.flixPref("torrent/keepBytes", 21474836480))
         progressWhere = String(MainCtx.flixPref("torrent/progressWhere", "both"))
         tmdbStatus = ""
         osStatus = ""
@@ -1004,6 +1006,18 @@ Item {
                     options: [{ value: "0", text: qsTr("Player default") }, { value: "4000", text: "4 s" },
                               { value: "8000", text: "8 s" }, { value: "15000", text: "15 s" }]
                     onPicked: (value) => { root.networkCaching = value; MainCtx.setFlixPref("torrent/networkCaching", Number(value)) }
+                }
+
+                Choice {
+                    label: qsTr("Keep watched torrents on disk")
+                    hint: qsTr("What a torrent downloaded stays on disk, so continuing it starts at once instead of fetching everything again. The oldest are removed when they add up to more than this. Clear it any time under Storage.")
+                    current: root.keepBytes
+                    options: [{ value: "0", text: qsTr("Don't keep") }, { value: "5368709120", text: "5 GB" },
+                              { value: "10737418240", text: "10 GB" }, { value: "21474836480", text: "20 GB" },
+                              { value: "53687091200", text: "50 GB" }]
+                    // kept as text: 20 GB as a number would be written to the ini as a double
+                    // ("2.147483648e+10"), which reads back as 0 - "don't keep"
+                    onPicked: (value) => { root.keepBytes = value; MainCtx.setFlixPref("torrent/keepBytes", String(value)) }
                 }
 
                 Choice {

@@ -50,8 +50,14 @@ Item {
     // the stream is now playing: closing this window must not stop the helper
     property bool handedOver: false
     readonly property bool streaming: stream !== null && stream.state !== "error" && stream.state !== "cancelled"
+    // tells this instance's streams from another dialog's (see onTorrentStatus)
+    readonly property string requesterId: Math.random().toString(36).slice(2)
 
     readonly property string displayTitle: info ? (info.title + (info.year > 0 ? " (" + info.year + ")" : "")) : ""
+    // what the window and the player's title bar show: "Title (2001)", or "Show - S01E02"
+    readonly property string streamTitle: info && info.isTv
+        ? info.title + " - S" + String(season).padStart(2, "0") + "E" + String(episode).padStart(2, "0")
+        : displayTitle
 
     readonly property var qualityRank: ({ "4K": 4, "1080p": 3, "720p": 2, "480p": 1, "SD": 1, "CAM": 0 })
 
@@ -147,6 +153,7 @@ Item {
                         tmdbId: info.tmdbId ?? 0, poster: info.poster ?? "",
                         mediaType: info.isTv ? "tv" : "movie",
                         season: info.isTv ? season : 0, episode: info.isTv ? episode : 0 }
+        source.requester = root.requesterId
         MainCtx.torrentStart(source)
     }
 
@@ -182,10 +189,19 @@ Item {
             // is on screen. Dropping it left the helper running with nothing playing it,
             // and the storage page then called that "in use by the current stream".
             if (status.state === "ready") {
+                // flix: only the dialog that started this stream plays it. The Home page
+                // holds a magnet dialog and a source picker at once (and the search page
+                // another pair), and each used to act on every "ready": the stream was
+                // added and started twice, the second start dropping the first one's
+                // connection mid-open, and the one that had not started it named the
+                // item after nothing, so the window showed the helper's address.
+                if (MainCtx.torrentSession.requester !== root.requesterId)
+                    return
                 root.handedOver = true
-                MediaLib.addAndPlay(status.url, MainCtx.torrentStreamOptions(root.displayTitle))
-                MainCtx.resumeFraction = MainCtx.torrentResume()
-                MainCtx.resumeNotice = 0
+                // a resumed stream opens at its saved time by itself; no seek from here
+                const startAt = MainCtx.playTorrentStream(status.url, root.streamTitle)
+                MainCtx.resumeFraction = 0
+                MainCtx.resumeNotice = startAt
                 MainCtx.playerView = true
                 root.stream = null
                 root.close()

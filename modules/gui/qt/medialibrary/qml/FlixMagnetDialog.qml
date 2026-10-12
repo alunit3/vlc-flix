@@ -41,6 +41,8 @@ Item {
     property var stream: null
     property bool handedOver: false
     readonly property bool streaming: stream !== null && stream.state !== "error" && stream.state !== "cancelled"
+    // tells this instance's streams from another dialog's (see onTorrentStatus)
+    readonly property string requesterId: Math.random().toString(36).slice(2)
 
     function open() {
         closeTimer.stop()
@@ -70,6 +72,7 @@ Item {
         source.fileIdx = entry.fileIdx ?? -1
         source.title = entry.title ?? ""
         source.meta = entry
+        source.requester = root.requesterId
         MainCtx.torrentStart(source)
     }
 
@@ -112,6 +115,7 @@ Item {
         const source = torrentFile !== "" ? { torrentFile: torrentFile } : { magnet: input.text.trim() }
         source.fileIdx = selectedIdx
         source.title = displayTitle
+        source.requester = root.requesterId
         MainCtx.torrentStart(source)
     }
 
@@ -167,10 +171,19 @@ Item {
             // that had never started. Closing the dialog cancels the stream through
             // close(), so a dialog that is not shown has nothing to cancel either.
             if (status.state === "ready") {
+                // flix: only the dialog that started this stream plays it. The Home page
+                // holds a magnet dialog and a source picker at once (and the search page
+                // another pair), and each used to act on every "ready": the stream was
+                // added and started twice, the second start dropping the first one's
+                // connection mid-open, and the one that had not started it named the
+                // item after nothing, so the window showed the helper's address.
+                if (MainCtx.torrentSession.requester !== root.requesterId)
+                    return
                 root.handedOver = true
-                MediaLib.addAndPlay(status.url, MainCtx.torrentStreamOptions(root.displayTitle))
-                MainCtx.resumeFraction = MainCtx.torrentResume()
-                MainCtx.resumeNotice = 0
+                // a resumed stream opens at its saved time by itself; no seek from here
+                const startAt = MainCtx.playTorrentStream(status.url, root.displayTitle)
+                MainCtx.resumeFraction = 0
+                MainCtx.resumeNotice = startAt
                 MainCtx.playerView = true
                 root.stream = null
                 root.close()

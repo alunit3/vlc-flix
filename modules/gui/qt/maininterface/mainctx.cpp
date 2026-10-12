@@ -569,36 +569,36 @@ void MainCtx::onInputChanged( bool hasInput )
     if( m_streamProc )
         setTorrentActive( hasInput && playingTorrentStream() );
 
-    if( hasInput == false )
+    /* Our stream stopped being what plays: the player let go of it, or something else -
+     * a local film - took its place. The torrent helper watches this process (not the
+     * player) to know when to quit, so it would otherwise outlive the stream: seeding in
+     * the background, its stats drawn over the next film and the storage page refusing to
+     * clear its data. Wait a moment first, because starting another title brings its own
+     * input and would otherwise cancel the stop.
+     *
+     * The generation is the *torrent* one, not the input one. It used to be bumped
+     * by every new input, which meant playing a local film in the two seconds after
+     * a stream ended cancelled the stop: the helper kept seeding and its data dir
+     * stayed put, so the storage page said "in use by the current stream" for a
+     * stream that had not run for hours. Only a new torrent should cancel this.
+     *
+     * Only arm the stop when it was the current torrent's own stream that went away.
+     * Switching torrents stops the old helper first, so the old stream fails and
+     * its input goes away *after* the new torrent has started: armed then, the
+     * stop would carry the new generation and kill the helper that was just
+     * launched. torrentStart() clears the active flag before that happens, which is
+     * what tells the two cases apart. */
+    if( wasTorrentActive && !m_torrentActive )
     {
-        /* The player let go of whatever it was playing. The torrent helper watches
-         * this process (not the player) to know when to quit, so it would otherwise
-         * outlive the stream and leave the storage page refusing to clear its data.
-         * Wait a moment first, because starting another title brings its own input and
-         * would otherwise cancel the stop.
-         *
-         * The generation is the *torrent* one, not the input one. It used to be bumped
-         * by every new input, which meant playing a local film in the two seconds after
-         * a stream ended cancelled the stop: the helper kept seeding and its data dir
-         * stayed put, so the storage page said "in use by the current stream" for a
-         * stream that had not run for hours. Only a new torrent should cancel this.
-         *
-         * Only arm the stop when it was the current torrent's own stream that ended.
-         * Switching torrents stops the old helper first, so the old stream fails and
-         * its input goes away *after* the new torrent has started: armed then, the
-         * stop would carry the new generation and kill the helper that was just
-         * launched, data folder and all. torrentStart() clears the active flag before
-         * that happens, which is what tells the two cases apart. */
-        if( wasTorrentActive )
-        {
-            const quint64 gen = m_torrentGeneration;
-            QTimer::singleShot( 2000, this, [this, gen]() {
-                if( m_torrentGeneration == gen && !playingTorrentStream() )
-                    stopTorrent();
-            } );
-        }
-        return;
+        const quint64 gen = m_torrentGeneration;
+        QTimer::singleShot( 2000, this, [this, gen]() {
+            if( m_torrentGeneration == gen && !playingTorrentStream() )
+                stopTorrent();
+        } );
     }
+
+    if( hasInput == false )
+        return;
     int autoRaise = var_InheritInteger( p_intf, "qt-auto-raise" );
     if ( autoRaise == MainCtx::RAISE_NEVER )
         return;
@@ -932,7 +932,9 @@ void MainCtx::torrentFiles(const QVariantMap &source)
                        torrentFile.isEmpty() ? QStringLiteral("--magnet") : QStringLiteral("--torrent-file"),
                        torrentFile.isEmpty() ? magnet : torrentFile,
                        QStringLiteral("--data-dir"),
-                       torrentDir() + QStringLiteral("/files-") + QString::number( QDateTime::currentSecsSinceEpoch() ) };
+                       torrentDir() + QStringLiteral("/files-") + QString::number( QDateTime::currentSecsSinceEpoch() ),
+                       // the metadata fetched here is saved for the stream that follows
+                       QStringLiteral("--cache-root"), torrentDir() + QStringLiteral("/data") };
     args << trackerArgs();
     proc->start( torrentHelper(), args );
 }
@@ -1400,6 +1402,57 @@ QStringList MainCtx::torrentStreamOptions(const QString &title) const
     return options;
 }
 
+// flix: start the helper's stream under the film's own name.
+//
+// Through MediaLib::addAndPlay(url) the playlist item was *named* after the url, and the
+// "meta-title" option above does not rescue it: the input only reads it for an item that
+// has not been preparsed, and the playlist preparses what it is given. So the window title
+// and the player's title bar fell back to the name, and cleanTitle() turned its dots into
+// spaces: "http://127 0 0 1 ...".
+//
+// The title is set on the item at playlist priority, the way an m3u entry's title is.
+// That keeps it above whatever tag the file itself carries, which for a torrent is often
+// the release name or the address of the site it came from.
+int MainCtx::playTorrentStream(const QString &url, const QString &title)
+{
+    const QString name = title.trimmed();
+    QStringList options = torrentStreamOptions( name );
+
+    // Continuing: open straight at the saved time, five seconds early as streaming
+    // services do. This used to play from 0 and seek from QML once playback had begun,
+    // then seek again four seconds later when the position had not moved yet (it cannot,
+    // while the first seek is still buffering). Every one of those seeks dropped a
+    // connection and opened another. start-time lets the demuxer go to the right place
+    // through the file's own index before anything is played.
+    int startAt = 0;
+    if( torrentResume() > 0.0 )
+    {
+        const QString key = m_torrentSession.value( QStringLiteral("resumeKey") ).toString();
+        const QVariantMap e = readResume().value( key ).toMap();
+        double seconds = e.value( QStringLiteral("seconds") ).toDouble();
+        if( seconds <= 0 )
+            seconds = e.value( QStringLiteral("fraction") ).toDouble() * e.value( QStringLiteral("length") ).toDouble();
+        startAt = qMax( 0, int( seconds ) - 5 );
+        if( startAt > 0 )
+            options << QStringLiteral("start-time=%1").arg( startAt );
+    }
+
+    vlc::playlist::Media media{ url, name.isEmpty() ? url : name, options };
+    if( !name.isEmpty() )
+    {
+        input_item_t *item = media.raw();
+        vlc_mutex_lock( &item->lock );
+        if( item->p_meta == nullptr )
+            item->p_meta = vlc_meta_New();
+        if( item->p_meta != nullptr )
+            vlc_meta_SetWithPriority( item->p_meta, vlc_meta_Title, qtu( name ),
+                                      VLC_META_PRIORITY_PLAYLIST );
+        vlc_mutex_unlock( &item->lock );
+    }
+    THEMPL->append( QVector<vlc::playlist::Media>{ media }, true );
+    return startAt;
+}
+
 // flix: the storage page used to refuse to clear the torrent data whenever the helper
 // process object still existed. The helper deliberately waits on this very process, so
 // that said nothing about whether anything was reading. Ask instead whether a stream
@@ -1466,7 +1519,8 @@ void dirSize( const QString &path, qint64 &bytes, int &files )
 QVariantList MainCtx::storageInfo() const
 {
     QVariantList list;
-    const QStringList dataFilters { QStringLiteral("data-*"), QStringLiteral("files-*") };
+    // data: the kept torrents (one folder each); data-* and files-*: per-session leftovers
+    const QStringList dataFilters { QStringLiteral("data"), QStringLiteral("data-*"), QStringLiteral("files-*") };
     for( const StorageKind &k : storageKinds )
     {
         qint64 bytes = 0;
@@ -1519,7 +1573,7 @@ bool MainCtx::clearStorage(const QString &kind)
             return false;
         stopTorrent();
         const QDir base( torrentDir() );
-        for( const QString &d : base.entryList( { QStringLiteral("data-*"), QStringLiteral("files-*") }, QDir::Dirs | QDir::NoDotAndDotDot ) )
+        for( const QString &d : base.entryList( { QStringLiteral("data"), QStringLiteral("data-*"), QStringLiteral("files-*") }, QDir::Dirs | QDir::NoDotAndDotDot ) )
             QDir( base.filePath( d ) ).removeRecursively();
         return true;
     }
@@ -1638,9 +1692,9 @@ void MainCtx::stopTorrent()
     }
 
     // flix: the helper is killed, not asked to leave, so the os.RemoveAll in its own
-    // exit path never runs and the half-downloaded film stayed on disk. Doing it here
-    // means the storage page has something to clear and the next stream starts from
-    // an empty folder.
+    // exit path never runs. m_torrentDataDir is only set when the data is not being kept
+    // (the "keep watched torrents" cap is 0); kept data stays for the next resume and the
+    // helper prunes it to the cap.
     if( !m_torrentDataDir.isEmpty() )
     {
         QDir dir( m_torrentDataDir );
@@ -1707,9 +1761,11 @@ void MainCtx::torrentStart(const QVariantMap &source)
     }
 
     const int fileIdx = source.value( QStringLiteral("fileIdx"), -1 ).toInt();
-    const QString dataDir = torrentDir() + QStringLiteral("/data-")
-                          + QString::number( QDateTime::currentSecsSinceEpoch() );
-    m_torrentDataDir = dataDir;
+    // flix: the data is kept per torrent (torrentDir()/data/<info hash>) so a resume finds
+    // what it downloaded last time, and the others are pruned to stay under the cap. With
+    // the cap at 0 nothing is kept: the helper reports its folder and stopTorrent() removes it.
+    const qint64 keepBytes = flixPref( QStringLiteral("torrent/keepBytes"), qint64( 20 ) << 30 ).toLongLong();
+    m_torrentDataDir.clear();
     m_streamProc = new QProcess( this );
     QProcess *proc = m_streamProc;
 
@@ -1733,6 +1789,14 @@ void MainCtx::torrentStart(const QVariantMap &source)
                 m_torrentStats = st;
                 emit torrentStatsChanged();
             }
+            // a folder that is not being kept is ours to remove when the stream ends
+            if( st.value( QStringLiteral("state") ).toString() == QLatin1String("metadata")
+                && !st.value( QStringLiteral("kept") ).toBool() )
+            {
+                const QString dir = QDir::cleanPath( st.value( QStringLiteral("dataDir") ).toString() );
+                if( dir.startsWith( QDir::cleanPath( torrentDir() ) + QLatin1Char('/') ) )
+                    m_torrentDataDir = dir;
+            }
             if( st.value( QStringLiteral("state") ).toString() == QLatin1String("ready") )
             {
                 // only ever play what our own helper serves on this machine
@@ -1754,6 +1818,9 @@ void MainCtx::torrentStart(const QVariantMap &source)
                              : rel.value( QStringLiteral("episode") ).toInt() );
                 info.insert( QStringLiteral("imdb"), meta.value( QStringLiteral("imdb") ).toString() );
                 info.insert( QStringLiteral("name"), name );
+                // the same for every start of this torrent file (the address is not): the
+                // subtitle service keeps the subtitle the user downloaded under it
+                info.insert( QStringLiteral("key"), m_torrentSession.value( QStringLiteral("resumeKey") ).toString() );
                 var_SetString( vlc_object_instance(p_intf), "flix-stream-info",
                                QJsonDocument( info ).toJson( QJsonDocument::Compact ).constData() );
                 if( m_torrentSession.value( QStringLiteral("title") ).toString().isEmpty() )
@@ -1793,7 +1860,8 @@ void MainCtx::torrentStart(const QVariantMap &source)
         emit torrentStatus( st );
     } );
 
-    // leftovers of earlier sessions (a killed helper cannot clean up after itself)
+    // leftovers of the old one-folder-per-session layout (data-<time>); kept data now lives
+    // under data/<info hash> and is pruned by the helper
     const QDir base( torrentDir() );
     for( const QString &old : base.entryList( { QStringLiteral("data-*") }, QDir::Dirs | QDir::NoDotAndDotDot ) )
         QDir( base.filePath( old ) ).removeRecursively();
@@ -1801,11 +1869,13 @@ void MainCtx::torrentStart(const QVariantMap &source)
     QStringList args { QStringLiteral("stream"),
                        torrentFile.isEmpty() ? QStringLiteral("--magnet") : QStringLiteral("--torrent-file"),
                        torrentFile.isEmpty() ? magnet : torrentFile,
-                       QStringLiteral("--data-dir"), dataDir,
+                       QStringLiteral("--cache-root"), torrentDir() + QStringLiteral("/data"),
+                       QStringLiteral("--cache-cap"), QString::number( qMax<qint64>( 0, keepBytes ) ),
                        QStringLiteral("--parent-pid"), QString::number( QCoreApplication::applicationPid() ) };
     if( fileIdx >= 0 )
         args << QStringLiteral("--file-idx") << QString::number( fileIdx );
-    // continuing: buffer the part the player is about to seek to before the stream is announced
+    // continuing: the helper then needs only the header and the index before "ready", since
+    // the player opens straight at the saved time (see playTorrentStream)
     if( const double resumeAt = torrentResume(); resumeAt > 0.0 )
         args << QStringLiteral("--start-fraction") << QString::number( resumeAt, 'f', 4 );
     args << trackerArgs();

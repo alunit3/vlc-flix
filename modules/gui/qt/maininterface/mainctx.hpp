@@ -474,6 +474,9 @@ public:
     bool torrentActive() const;
     // per-item options for a torrent stream; one place so both start dialogs agree
     Q_INVOKABLE QStringList torrentStreamOptions(const QString &title) const;
+    // play the helper's stream under the film's own title (window, title bar), not its url;
+    // a resumed stream opens at its saved time, which is returned (seconds, 0 from the start)
+    Q_INVOKABLE int playTorrentStream(const QString &url, const QString &title);
 
     // VLCFlix settings: the flix-* / flixsubs-* VLC options (a fixed list), kept in the VLC settings file
     Q_INVOKABLE QVariant vlcOption(const QString &name) const;

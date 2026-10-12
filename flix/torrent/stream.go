@@ -16,7 +16,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	g "github.com/anacrolix/generics"
 	"github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/storage"
 	"github.com/anacrolix/torrent/types"
 	"golang.org/x/time/rate"
 )
@@ -31,6 +33,8 @@ var videoExt = map[string]bool{
 const (
 	headBytes = 12 << 20 // buffered before playback starts
 	tailBytes = 3 << 20  // mp4 moov / mkv cues often live at the end
+	// resuming: only the container header is read from the start of the file
+	resumeHeadBytes = 2 << 20
 	// smallest token bucket we hand to a limiter: the socket buffer size the torrent
 	// library assumes, so even a small cap refills in chunks worth sending
 	minRateBurst = 1 << 20
@@ -309,21 +313,54 @@ func (r *playingReader) Seek(offset int64, whence int) (int64, error) {
 	return pos, nil
 }
 
-func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep bool, parentPid int, startFrac float64, rateLimit, uploadLimit int64, streamOnly bool, window int64) int {
+func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep bool, parentPid int, startFrac float64, rateLimit, uploadLimit int64, streamOnly bool, window int64, cacheRoot string, cacheCap int64) int {
 	if torrentFile == "" && !reMagnet.MatchString(magnet) {
 		return fail("bad magnet link")
 	}
+	spec, err := torrentSpec(magnet, torrentFile)
+	if err != nil {
+		return fail("cannot read torrent: " + err.Error())
+	}
+	hash := spec.InfoHash.HexString()
+
+	// Kept data: this torrent's own folder, reused by the next start. The others are pruned
+	// oldest first to stay under the cap; with no cap the folder goes when we do.
+	if cacheRoot != "" {
+		dataDir = filepath.Join(cacheRoot, hash)
+		keep = cacheCap > 0
+		if keep {
+			pruneCache(cacheRoot, hash, cacheCap)
+		}
+	}
 	if dataDir == "" {
-		return fail("missing --data-dir")
+		return fail("missing --data-dir or --cache-root")
 	}
 	if err := os.MkdirAll(dataDir, 0o700); err != nil {
 		return fail("cannot create data dir: " + err.Error())
 	}
+	touch(dataDir)
+	// a magnet whose metadata was saved last time needs nothing from the swarm to start
+	if spec.InfoBytes == nil {
+		spec.InfoBytes = loadInfo(dataDir, spec.InfoHash)
+	}
 
 	cfg := torrent.NewDefaultClientConfig()
 	cfg.DataDir = dataDir
-	cfg.ListenPort = 0
 	cfg.Seed = false
+	// Write straight into the film's own file, not a ".part" file promoted at the end.
+	//
+	// With part files (the library's default) every start runs setCompletionFromPartFiles,
+	// which marks each piece of a file that is not yet whole as *not* complete - and a stream
+	// never downloads the whole film. So every restart threw away what was on disk and a
+	// resume fetched the head, the tail and its position all over again. Without part files
+	// the completion database next to the data is believed (each piece's file is still
+	// checked for size), and the rename of an open file that Windows refuses
+	// ("promoting part file ... Access is denied") does not happen either.
+	store := storage.NewFileOpts(storage.NewFileClientOpts{
+		ClientBaseDir: dataDir,
+		UsePartFiles:  g.Some(false),
+	})
+	cfg.DefaultStorage = store
 	// speed caps from the player settings (bytes/s); 0 keeps the library default
 	if rateLimit > 0 {
 		cfg.DownloadRateLimiter = rate.NewLimiter(rate.Limit(rateLimit), int(max(rateLimit, minRateBurst)))
@@ -331,12 +368,15 @@ func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep boo
 	if uploadLimit > 0 {
 		cfg.UploadRateLimiter = rate.NewLimiter(rate.Limit(uploadLimit), int(max(uploadLimit, minRateBurst)))
 	}
-	client, err := torrent.NewClient(cfg)
+	client, err := newClient(cfg)
 	if err != nil {
+		store.Close()
 		return fail("cannot start torrent client: " + err.Error())
 	}
 	defer func() {
 		client.Close()
+		// a storage we passed in is ours to close: it holds the completion database
+		store.Close()
 		if !keep {
 			os.RemoveAll(dataDir)
 		}
@@ -358,12 +398,7 @@ func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep boo
 	}
 
 	emit(map[string]any{"event": "connecting"})
-	var t *torrent.Torrent
-	if torrentFile != "" {
-		t, err = client.AddTorrentFromFile(torrentFile)
-	} else {
-		t, err = client.AddMagnet(magnet)
-	}
+	t, _, err := client.AddTorrentSpec(spec)
 	if err != nil {
 		return fail("cannot add torrent: " + err.Error())
 	}
@@ -375,6 +410,7 @@ func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep boo
 	case <-time.After(90 * time.Second):
 		return fail("no metadata after 90 s (no peers?)")
 	}
+	saveInfo(dataDir, t.Metainfo().InfoBytes)
 
 	// pick the file
 	var file *torrent.File
@@ -394,7 +430,8 @@ func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep boo
 	if file == nil {
 		return fail("no video file in this torrent")
 	}
-	emit(map[string]any{"event": "metadata", "name": file.DisplayPath(), "size": file.Length(), "files": len(files)})
+	emit(map[string]any{"event": "metadata", "name": file.DisplayPath(), "size": file.Length(), "files": len(files),
+		"dataDir": dataDir, "kept": keep})
 
 	// download only this file, start with its head and tail
 	for _, f := range files {
@@ -403,7 +440,19 @@ func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep boo
 		}
 	}
 	length := file.Length()
+	// Resuming, the player opens at the saved time (its start-time option), so it reads the
+	// container header, the index at the end and then the resume point. The header is all
+	// that is needed from the start: waiting for the full head would only hold "ready" back.
+	//
+	// The resume point itself is not guessed here any more. It used to be length x fraction,
+	// but the fraction is one of *time*, and with a variable bitrate that byte offset can be
+	// hundreds of megabytes from where the player actually lands - a wait for data nobody
+	// asked for, after which the real position still had to be fetched.
+	resuming := startFrac > 0.01 && startFrac < 0.99
 	head := int64(headBytes)
+	if resuming {
+		head = resumeHeadBytes
+	}
 	if head > length {
 		head = length
 	}
@@ -418,23 +467,6 @@ func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep boo
 	}
 	for i := tb; i <= te; i++ {
 		t.Piece(i).SetPriority(types.PiecePriorityHigh)
-	}
-	// resuming: the player will seek to startFrac right away, so that part must be in before "ready"
-	// (otherwise the seek waits for the download and the seek bar stays at the start)
-	sb, se := -1, -2
-	if startFrac > 0.01 && startFrac < 0.99 {
-		off := int64(float64(length) * startFrac)
-		if off -= int64(headBytes) / 4; off < 0 {
-			off = 0
-		}
-		end := off + int64(headBytes)
-		if end > length {
-			end = length
-		}
-		sb, se = pieceRange(t, file, off, end)
-		for i := sb; i <= se; i++ {
-			t.Piece(i).SetPriority(types.PiecePriorityHigh)
-		}
 	}
 
 	// Not streaming: the whole file is wanted, so let the client fetch it in order.
@@ -537,6 +569,14 @@ func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep boo
 		}
 		reader.SetReadahead(readahead)
 
+		// Tie the reader to the request. A read waits for its data for as long as it takes,
+		// so without this a connection the player had dropped - every seek drops one - kept
+		// its handler parked in Read and its readahead window registered. The library serves
+		// readahead lowest piece first, so such a leftover behind the playhead won the
+		// bandwidth from the connection the player was actually waiting on, and a resume
+		// sat buffering while the swarm filled a part of the film nobody would read.
+		reader.SetContext(r.Context())
+
 		live := &playingReader{r: reader, length: length}
 		readersMu.Lock()
 		readers[live] = struct{}{}
@@ -569,11 +609,6 @@ func runStream(magnet, torrentFile string, fileIdx int, dataDir string, keep boo
 		td, tt := piecesComplete(t, tb, te)
 		have := hd + td
 		need := ht + tt
-		if se >= sb {
-			sd, st := piecesComplete(t, sb, se)
-			have += sd
-			need += st
-		}
 		pct := 100
 		if need > 0 {
 			pct = have * 100 / need

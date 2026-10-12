@@ -11,7 +11,7 @@ import (
 )
 
 // runFiles prints the name and the files of a torrent (metadata only, nothing is downloaded).
-func runFiles(magnet, torrentFile, dataDir string) int {
+func runFiles(magnet, torrentFile, dataDir, cacheRoot string) int {
 	if torrentFile == "" && !reMagnet.MatchString(magnet) {
 		emit(map[string]any{"error": "bad magnet link"})
 		return 1
@@ -25,9 +25,8 @@ func runFiles(magnet, torrentFile, dataDir string) int {
 
 	cfg := torrent.NewDefaultClientConfig()
 	cfg.DataDir = dataDir
-	cfg.ListenPort = 0
 	cfg.Seed = false
-	client, err := torrent.NewClient(cfg)
+	client, err := newClient(cfg)
 	if err != nil {
 		emit(map[string]any{"error": "cannot start torrent client: " + err.Error()})
 		return 1
@@ -50,6 +49,13 @@ func runFiles(magnet, torrentFile, dataDir string) int {
 	case <-time.After(60 * time.Second):
 		emit(map[string]any{"error": "no metadata after 60 s (no peers?)"})
 		return 1
+	}
+	// the stream started from this list then finds the metadata on disk instead of asking
+	// the swarm for it a second time
+	if cacheRoot != "" {
+		dir := filepath.Join(cacheRoot, t.InfoHash().HexString())
+		saveInfo(dir, t.Metainfo().InfoBytes)
+		touch(dir)
 	}
 	// nothing is wanted from this torrent: stop downloading right away
 	for _, f := range t.Files() {

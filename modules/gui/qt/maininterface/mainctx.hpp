@@ -627,6 +627,8 @@ protected:
     // bumped only when a *torrent* starts, so that starting a local film in the
     // two-second window after a stream ends cannot cancel the pending stop
     quint64 m_torrentGeneration = 0;
+    // the address the current helper serves its stream on, from its "ready"
+    QString m_torrentUrl;
     QByteArray m_streamBuffer;
     QString m_torrentError;
     QVariantMap m_torrentStats;
@@ -645,6 +647,7 @@ protected:
     void stopTorrent();
     void setTorrentActive( bool );
     bool playingTorrentStream() const;
+    void updateTorrentUse();
     void flushMetaRequests();
     void queueMeta(const QString &key, const QVariantMap &req);
 

@@ -154,8 +154,14 @@ Item {
                         mediaType: info.isTv ? "tv" : "movie",
                         season: info.isTv ? season : 0, episode: info.isTv ? episode : 0 }
         source.requester = root.requesterId
+        // an invalid source is refused with an "error" before the session is ours
+        // (see onTorrentStatus): this lets that one through
+        _starting = true
         MainCtx.torrentStart(source)
+        _starting = false
     }
+
+    property bool _starting: false
 
     function _speed(bps) {
         return bps >= 1048576 ? (bps / 1048576).toFixed(1) + " MB/s" : Math.round(bps / 1024) + " KB/s"
@@ -209,6 +215,13 @@ Item {
                 return
             }
             if (!root.shown)
+                return
+            // flix: only the stream this picker started, since it was opened. Every status
+            // line used to be taken, so a picker opened while another stream's helper was
+            // still running showed that one's "Buffering 100 % - 0 peers" under a Cancel
+            // button, locked its list, and Cancel would have stopped the other stream.
+            if (root.stream === null
+                    || (!root._starting && MainCtx.torrentSession.requester !== root.requesterId))
                 return
             if (status.state === "progress" || status.state === "connecting" || status.state === "metadata"
                     || status.state === "error" || status.state === "cancelled")

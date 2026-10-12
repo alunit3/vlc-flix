@@ -270,6 +270,8 @@ MainCtx::MainCtx(qt_intf_t *_p_intf)
     /* Main Interface statusbar */
     /* and title of the Main Interface*/
     connect( THEMIM, &PlayerController::inputChanged, this, &MainCtx::onInputChanged );
+    /* flix: stopping keeps the stream as the current media, see updateTorrentUse() */
+    connect( THEMIM, &PlayerController::playingStateChanged, this, &MainCtx::updateTorrentUse );
 
     /* END CONNECTS ON IM */
 
@@ -566,12 +568,37 @@ void MainCtx::reloadPrefs()
 
 void MainCtx::onInputChanged( bool hasInput )
 {
+    updateTorrentUse();
+
+    if( hasInput == false )
+        return;
+    int autoRaise = var_InheritInteger( p_intf, "qt-auto-raise" );
+    if ( autoRaise == MainCtx::RAISE_NEVER )
+        return;
+    if( THEMIM->hasVideoOutput() == true )
+    {
+        if( ( autoRaise & MainCtx::RAISE_VIDEO ) == 0 )
+            return;
+    }
+    else if ( ( autoRaise & MainCtx::RAISE_AUDIO ) == 0 )
+        return;
+    emit askRaise();
+}
+
+// flix: called when the current media changes *and* when the player's state does.
+//
+// It used to run on a media change only. Stopping the player (the player's back button
+// does) keeps the stream as the current media, so nothing ran: the helper went on for
+// as long as VLCFlix stayed open, still reporting "Buffering 100 % - 0 peers", and the
+// next source picker opened showed those lines as if they were its own stream.
+void MainCtx::updateTorrentUse()
+{
     // flix: torrent data is only really in use while our own stream is the thing
     // playing. Ask the playlist rather than the helper process: the helper watches
     // this process and stays alive until we stop it, so its existence says nothing.
     const bool wasTorrentActive = m_torrentActive;
     if( m_streamProc )
-        setTorrentActive( hasInput && playingTorrentStream() );
+        setTorrentActive( playingTorrentStream() );
 
     /* Our stream stopped being what plays: the player let go of it, or something else -
      * a local film - took its place. The torrent helper watches this process (not the
@@ -600,27 +627,21 @@ void MainCtx::onInputChanged( bool hasInput )
                 stopTorrent();
         } );
     }
-
-    if( hasInput == false )
-        return;
-    int autoRaise = var_InheritInteger( p_intf, "qt-auto-raise" );
-    if ( autoRaise == MainCtx::RAISE_NEVER )
-        return;
-    if( THEMIM->hasVideoOutput() == true )
-    {
-        if( ( autoRaise & MainCtx::RAISE_VIDEO ) == 0 )
-            return;
-    }
-    else if ( ( autoRaise & MainCtx::RAISE_AUDIO ) == 0 )
-        return;
-    emit askRaise();
 }
 
-// true when the item that is playing is the one the helper is serving
+// true when the item that is playing is the one the helper is serving. A stopped
+// player is not playing it, even though the stream is still its current media.
+//
+// The address is this helper's own, from its "ready". Any 127.0.0.1 address used to
+// count, and now that player state changes ask too, the stream of a torrent being
+// replaced - still playing until its helper is gone - would mark the new helper as in
+// use and then arm the stop that kills it before its own stream has started.
 bool MainCtx::playingTorrentStream() const
 {
     PlayerController *pc = p_intf->p_mainPlayerController;
-    if( pc == nullptr )
+    if( pc == nullptr || m_torrentUrl.isEmpty() )
+        return false;
+    if( pc->getPlayingState() == PlayerController::PLAYING_STATE_STOPPED )
         return false;
     input_item_t *input = pc->getInput();
     if( input == nullptr )
@@ -628,7 +649,7 @@ bool MainCtx::playingTorrentStream() const
     char *uri = input_item_GetURI( input );
     if( uri == nullptr )
         return false;
-    const bool ours = strncmp( uri, "http://127.0.0.1", 16 ) == 0;
+    const bool ours = QString::fromUtf8( uri ) == m_torrentUrl;
     free( uri );
     return ours;
 }
@@ -1687,6 +1708,7 @@ void MainCtx::stopTorrent()
 
     QProcess *proc = m_streamProc;
     m_streamProc = nullptr;
+    m_torrentUrl.clear();
     setTorrentActive( false );
     if( proc )
     {
@@ -1814,6 +1836,7 @@ void MainCtx::torrentStart(const QVariantMap &source)
                 const QUrl url( st.value( QStringLiteral("url") ).toString() );
                 if( url.scheme() != QLatin1String("http") || url.host() != QLatin1String("127.0.0.1") )
                     continue;
+                m_torrentUrl = st.value( QStringLiteral("url") ).toString();
                 // tell the subtitle service what this stream is (the URL has no name)
                 const QString name = st.value( QStringLiteral("name") ).toString();
                 QVariantMap meta = m_torrentSession.value( QStringLiteral("meta") ).toMap();

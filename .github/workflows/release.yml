@@ -79,6 +79,10 @@ jobs:
       - name: Build and package
         run: |
           mkdir -p "$RUNNER_TEMP/build" dist
+          # the image builds as its own "videolan" user, which must be able to write the
+          # mounted folders: the build directory, the output, and the source tree itself
+          # (bootstrap generates configure and the Makefile.in files there)
+          chmod -R a+rwX "$GITHUB_WORKSPACE" "$RUNNER_TEMP/build"
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/vlc" \
             -v "$RUNNER_TEMP/build:/build" \

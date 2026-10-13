@@ -851,7 +851,7 @@ Item {
 
                 Choice {
                     label: qsTr("Default online player (Watch online)")
-                    hint: qsTr("The provider that opens first. The full list is editable in:\n%1").arg(MainCtx.providersFile())
+                    hint: qsTr("The provider that opens first. The list updates itself from the project's GitHub. Your own entries (or \"disabled\": true to hide one) go in:\n%1").arg(MainCtx.providersFile())
                     current: root.defaultProvider
                     options: root.providerNames.map(n => ({ value: n, text: n }))
                     onPicked: (value) => { root.defaultProvider = value; MainCtx.setFlixPref("web/default", value) }

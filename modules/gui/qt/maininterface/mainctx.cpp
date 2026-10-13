@@ -968,7 +968,8 @@ void MainCtx::torrentFiles(const QVariantMap &source)
 
 static const char *const defaultProviders = R"JSON([
   {"name": "VidStuck",    "host": "vidstuck.xyz",      "movie": "https://vidstuck.xyz/embed/movie/{tmdb}", "tv": "https://vidstuck.xyz/embed/tv/{tmdb}/{season}/{episode}", "start": "progress"},
-  {"name": "VidLink",     "host": "vidlink.pro",       "movie": "https://vidlink.pro/movie/{tmdb}",       "tv": "https://vidlink.pro/tv/{tmdb}/{season}/{episode}", "start": "startAt"},
+  {"name": "FrameXTV",    "host": "framextv.xyz",      "movie": "https://framextv.xyz/embed/movie/{tmdb}", "tv": "https://framextv.xyz/embed/tv/{tmdb}/{season}/{episode}"},
+  {"name": "VidLink",     "host": "vidlink.pro",      "movie": "https://vidlink.pro/movie/{tmdb}",       "tv": "https://vidlink.pro/tv/{tmdb}/{season}/{episode}", "start": "startAt"},
   {"name": "VixSrc",      "host": "vixsrc.to",         "movie": "https://vixsrc.to/movie/{tmdb}",         "tv": "https://vixsrc.to/tv/{tmdb}/{season}/{episode}"},
   {"name": "VidFast",     "host": "vidfast.vc",        "movie": "https://vidfast.vc/movie/{tmdb}",        "tv": "https://vidfast.vc/tv/{tmdb}/{season}/{episode}", "start": "startAt"},
   {"name": "VidZee",      "host": "vidzee.wtf",        "movie": "https://vidzee.wtf/movie/{tmdb}",        "tv": "https://vidzee.wtf/tv/{tmdb}/{season}/{episode}"},
@@ -983,31 +984,49 @@ static const char *const defaultProviders = R"JSON([
 
 QVariantList MainCtx::webProviders()
 {
-    // user-editable: written once, then read every time so URL patterns can be corrected
-    const QString path = torrentDir() + QStringLiteral("/../flix-providers.json");
-    if( !QFileInfo::exists( path ) )
-    {
-        QFile out( path );
-        if( out.open( QIODevice::WriteOnly ) )
-            out.write( defaultProviders );
-    }
-    QFile file( path );
-    QByteArray raw = defaultProviders;
-    if( file.open( QIODevice::ReadOnly ) )
-        raw = file.readAll();
-    QJsonArray list = QJsonDocument::fromJson( raw ).array();
+    // The list is the one the Lua service last fetched from the project's GitHub
+    // (flix-providers-remote.json), or the built-in one when there is none. The user's own
+    // flix-providers.json is a layer on top: an entry with a known name replaces it, a new
+    // name is added, "disabled": true hides one. Entries identical to a built-in one are old
+    // copies from when this file was the whole list, and are ignored so updates still reach
+    // those installs.
+    const QJsonArray builtin = QJsonDocument::fromJson( defaultProviders ).array();
+    QJsonArray list;
+    QFile remote( userFile( QStringLiteral("flix-providers-remote.json") ) );
+    if( remote.open( QIODevice::ReadOnly ) )
+        list = QJsonDocument::fromJson( remote.readAll() ).object().value( QStringLiteral("providers") ).toArray();
     if( list.isEmpty() )
-        list = QJsonDocument::fromJson( defaultProviders ).array();
+        list = builtin;
+
+    QFile user( providersFile() );
+    if( user.open( QIODevice::ReadOnly ) )
+    {
+        const QJsonArray mine = QJsonDocument::fromJson( user.readAll() ).array();
+        for( const QJsonValue &v : mine )
+        {
+            if( builtin.contains( v ) )
+                continue;
+            const QString name = v.toObject().value( QStringLiteral("name") ).toString();
+            int at = -1;
+            for( int i = 0; i < list.size(); ++i )
+                if( list.at( i ).toObject().value( QStringLiteral("name") ).toString() == name )
+                    at = i;
+            if( at >= 0 )
+                list.replace( at, v );
+            else
+                list.append( v );
+        }
+    }
+
     QVariantList result;
     for( const QJsonValue &v : std::as_const( list ) )
     {
         const QJsonObject o = v.toObject();
         // only https pages on the provider's own host are ever opened
         const QString host = o.value( QStringLiteral("host") ).toString();
-        if( host.isEmpty() )
+        if( host.isEmpty() || o.value( QStringLiteral("disabled") ).toBool() )
             continue;
-        QVariantMap m = o.toVariantMap();
-        result.append( m );
+        result.append( o.toVariantMap() );
     }
     // the preferred provider (VidStuck unless changed) goes first, whatever order the file has
     const QString preferred = flixPref( QStringLiteral("web/default"), QStringLiteral("VidStuck") ).toString();
@@ -1369,9 +1388,8 @@ QString MainCtx::providersFile() const
 
 void MainCtx::resetWebProviders()
 {
-    QFile out( torrentDir() + QStringLiteral("/../flix-providers.json") );
-    if( out.open( QIODevice::WriteOnly | QIODevice::Truncate ) )
-        out.write( defaultProviders );
+    // back to the project's list: only the user's own layer goes
+    QFile::remove( providersFile() );
 }
 
 // --- trackers -------------------------------------------------------------------------------

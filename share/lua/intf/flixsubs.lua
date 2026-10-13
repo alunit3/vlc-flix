@@ -449,6 +449,71 @@ local function update_step()
     end
 end
 
+------------------------------------------------------------------------------
+-- web providers
+------------------------------------------------------------------------------
+-- The list of streaming providers of "Watch online" lives in flix/providers.json of this
+-- project, so a dead domain or a new site does not need a new release. It is fetched at most
+-- once a day (same switch as the update check) and kept in flix-providers-remote.json
+-- ({checked, providers}); the interface reads that file and falls back to its built-in list.
+
+local PROVIDERS_URL = "https://raw.githubusercontent.com/alunit3/vlc-flix/flix/main/flix/providers.json"
+local providers_due = vlc.misc.mdate() + 30000000
+
+local function providers_file()
+    return vlc.config.userdatadir() .. "/flix-providers-remote.json"
+end
+
+-- only https pages on the provider's own host are ever accepted
+local function valid_provider(p)
+    if type(p) ~= "table" then return false end
+    for _, key in ipairs({ "name", "host", "movie", "tv" }) do
+        if type(p[key]) ~= "string" or p[key] == "" then return false end
+    end
+    if p.host:find("[^%w%.%-]") then return false end
+    local prefix = "https://" .. p.host .. "/"
+    local function ok(url)
+        return url:sub(1, #prefix) == prefix and not url:find("[%s\"'<>]")
+    end
+    return ok(p.movie) and ok(p.tv)
+end
+
+local function providers_step()
+    if not providers_due or vlc.misc.mdate() < providers_due then return end
+    providers_due = nil
+    if not flag("flix-update-check", true) then return end
+
+    local file = vlc.io.open(providers_file(), "rb")
+    if file then
+        local text = file:read("*a")
+        file:close()
+        local saved = text and json.decode(text)
+        if type(saved) == "table" and tonumber(saved.checked) and os.time() - tonumber(saved.checked) < 86400 then
+            return
+        end
+    end
+
+    local status, body = vlc.http.get(PROVIDERS_URL)
+    if status ~= 200 or not body or #body > 65536 then return end   -- offline or no file: keep the cache
+    local list = json.decode(body)
+    if type(list) ~= "table" then return end
+    local good = {}
+    for _, p in ipairs(list) do
+        if valid_provider(p) then
+            local entry = { name = p.name, host = p.host, movie = p.movie, tv = p.tv }
+            if type(p.start) == "string" then entry.start = p.start end
+            good[#good + 1] = entry
+        end
+    end
+    if #good == 0 then return end
+    local out = vlc.io.open(providers_file(), "wb")
+    if out then
+        out:write(json.encode({ checked = os.time(), providers = good }))
+        out:close()
+        log("provider list updated (" .. #good .. ")")
+    end
+end
+
 -- The subtitle chosen last time goes back on as soon as a film is playing. This runs first
 -- in every tick: the metadata queue below can hold the loop for a long while at start-up
 -- (the Home page asks for every poster at once), and a restore waiting behind it showed up
@@ -467,6 +532,7 @@ local function step()
     restore_step()
     local ok, err = pcall(update_step)
     if not ok then vlc.msg.warn("[flixsubs] update check failed: " .. tostring(err)) end
+    pcall(providers_step)
     pcall(meta_step)
     pcall(account_step)
     -- the interface answered a subtitle offer

@@ -1,0 +1,83 @@
+[
+  {
+    "name": "VidStuck",
+    "host": "vidstuck.xyz",
+    "movie": "https://vidstuck.xyz/embed/movie/{tmdb}",
+    "tv": "https://vidstuck.xyz/embed/tv/{tmdb}/{season}/{episode}",
+    "start": "progress"
+  },
+  {
+    "name": "FrameXTV",
+    "host": "framextv.xyz",
+    "movie": "https://framextv.xyz/embed/movie/{tmdb}",
+    "tv": "https://framextv.xyz/embed/tv/{tmdb}/{season}/{episode}"
+  },
+  {
+    "name": "VidLink",
+    "host": "vidlink.pro",
+    "movie": "https://vidlink.pro/movie/{tmdb}",
+    "tv": "https://vidlink.pro/tv/{tmdb}/{season}/{episode}",
+    "start": "startAt"
+  },
+  {
+    "name": "VixSrc",
+    "host": "vixsrc.to",
+    "movie": "https://vixsrc.to/movie/{tmdb}",
+    "tv": "https://vixsrc.to/tv/{tmdb}/{season}/{episode}"
+  },
+  {
+    "name": "VidFast",
+    "host": "vidfast.vc",
+    "movie": "https://vidfast.vc/movie/{tmdb}",
+    "tv": "https://vidfast.vc/tv/{tmdb}/{season}/{episode}",
+    "start": "startAt"
+  },
+  {
+    "name": "VidZee",
+    "host": "vidzee.wtf",
+    "movie": "https://vidzee.wtf/movie/{tmdb}",
+    "tv": "https://vidzee.wtf/tv/{tmdb}/{season}/{episode}"
+  },
+  {
+    "name": "VidNest",
+    "host": "vidnest.fun",
+    "movie": "https://vidnest.fun/movie/{tmdb}",
+    "tv": "https://vidnest.fun/tv/{tmdb}/{season}/{episode}"
+  },
+  {
+    "name": "CineSrc",
+    "host": "cinesrc.st",
+    "movie": "https://cinesrc.st/embed/movie/{tmdb}",
+    "tv": "https://cinesrc.st/embed/tv/{tmdb}?s={season}&e={episode}"
+  },
+  {
+    "name": "Atlantic",
+    "host": "atlantic.st",
+    "movie": "https://atlantic.st/movie/{tmdb}",
+    "tv": "https://atlantic.st/tv/{tmdb}/{season}/{episode}"
+  },
+  {
+    "name": "VidRift",
+    "host": "vidrift.net",
+    "movie": "https://vidrift.net/?tmdb={tmdb}",
+    "tv": "https://vidrift.net/?tmdb={tmdb}&s={season}&e={episode}"
+  },
+  {
+    "name": "Vidy",
+    "host": "www.vidy.st",
+    "movie": "https://www.vidy.st/movie/{tmdb}",
+    "tv": "https://www.vidy.st/tv/{tmdb}/{season}/{episode}"
+  },
+  {
+    "name": "SuperEmbed",
+    "host": "superembed.stream",
+    "movie": "https://superembed.stream/?tmdb={tmdb}",
+    "tv": "https://superembed.stream/?tmdb={tmdb}&s={season}&e={episode}"
+  },
+  {
+    "name": "PrimeWire",
+    "host": "primewire.mov",
+    "movie": "https://primewire.mov/movie/{tmdb}",
+    "tv": "https://primewire.mov/tv/{tmdb}/{season}/{episode}"
+  }
+]

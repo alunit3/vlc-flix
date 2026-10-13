@@ -36,5 +36,7 @@ This fork of VLC (GPL-2.0-or-later) includes work derived from other projects.
 ## Web player
 - `flix/web` (Go) hosts a **Microsoft Edge WebView2** window (https://github.com/jchv/go-webview2, MIT) that shows the
   web player of a streaming provider chosen in "Watch online". It needs the WebView2 runtime (part of Windows 11 / Edge).
-  The provider list is `flix-providers.json` in the user data folder and can be edited. The player only shows the
-  provider's own page; nothing is extracted from it.
+  The provider list is `flix/providers.json` of this repository, fetched once a day (the same switch as the update
+  check; whoever can push to the repository controls it) and checked to be https pages on each provider's own host.
+  `flix-providers.json` in the user data folder adds or replaces entries. The player only shows the provider's own
+  page; nothing is extracted from it.

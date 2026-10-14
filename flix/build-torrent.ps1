@@ -1,12 +1,14 @@
 # Builds the torrent helper (flix/torrent, Go) into <run>\flix\flixtorrent.exe.
-#   ./flix/build-torrent.ps1
+#   ./flix/build-torrent.ps1 [-Out <run tree>\flix]
 # Needs Go 1.24+. The helper is a separate small program: the player starts it to look up torrent
-# sources for a title and to stream the chosen torrent over http://127.0.0.1.
+# sources for a title and to stream the chosen torrent over http://127.0.0.1. It has to be in
+# flix\ next to vlcflix.exe; dev.ps1 passes -Out for its -RunDir.
+param([string]$Out = "")
 $ErrorActionPreference = "Stop"
 
 $src  = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $root = Split-Path $src -Parent
-$out  = Join-Path $root "run\flix"
+$out  = if ($Out) { $Out } else { Join-Path $root "run\flix" }
 New-Item -ItemType Directory -Force $out | Out-Null
 
 if (-not (Get-Command go -ErrorAction SilentlyContinue)) {

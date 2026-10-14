@@ -1098,6 +1098,10 @@ libqml_module_medialibrary_a_QML = \
 	medialibrary/qml/FlixMagnetDialog.qml \
 	medialibrary/qml/FlixMeta.qml \
 	medialibrary/qml/FlixLibraryPrompt.qml \
+	medialibrary/qml/FlixButton.qml \
+	medialibrary/qml/FlixField.qml \
+	medialibrary/qml/FlixFolderList.qml \
+	medialibrary/qml/FlixWelcome.qml \
 	medialibrary/qml/FlixMoreInfo.qml \
 	medialibrary/qml/FlixRow.qml \
 	medialibrary/qml/FlixSearchDisplay.qml \

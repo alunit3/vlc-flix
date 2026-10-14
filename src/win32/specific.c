@@ -69,6 +69,54 @@ typedef struct
     char data[];
 } vlc_ipc_data_t;
 
+#define VLC_IPC_NAME L"VLCFlix ipc " TEXT(VERSION)
+
+/* Hands the command line to the running instance. Returns true once that instance
+ * took it; false when it did not answer, which means it is on its way out. */
+static bool SendToRunningInstance( libvlc_int_t *p_this, HWND ipcwindow,
+                                   int i_argc, const char *const ppsz_argv[] )
+{
+    vlc_ipc_data_t *p_data;
+    size_t i_data = sizeof (*p_data);
+
+    for( int i_opt = 0; i_opt < i_argc; i_opt++ )
+    {
+        i_data += sizeof (size_t);
+        i_data += strlen( ppsz_argv[ i_opt ] ) + 1;
+    }
+
+    p_data = malloc( i_data );
+    if( unlikely(p_data == NULL) )
+        return false;
+    p_data->argc = i_argc;
+    p_data->enqueue = var_InheritBool( p_this, "playlist-enqueue" );
+    size_t i_pos = 0;
+    for( int i_opt = 0; i_opt < i_argc; i_opt++ )
+    {
+        size_t i_len = strlen( ppsz_argv[ i_opt ] ) + 1;
+        memcpy( &p_data->data[i_pos], &i_len, sizeof (size_t) );
+        i_pos += sizeof (size_t);
+        memcpy( &p_data->data[i_pos], ppsz_argv[ i_opt ], i_len );
+        i_pos += i_len;
+    }
+
+    /* the running instance raises its window when asked to; Windows only lets it
+     * take the foreground if the process the user just started allows it */
+    DWORD pid;
+    if( GetWindowThreadProcessId( ipcwindow, &pid ) )
+        AllowSetForegroundWindow( pid );
+
+    COPYDATASTRUCT wm_data;
+    wm_data.dwData = 0;
+    wm_data.cbData = i_data;
+    wm_data.lpData = p_data;
+    DWORD_PTR result = FALSE;
+    LRESULT sent = SendMessageTimeout( ipcwindow, WM_COPYDATA, 0, (LPARAM)&wm_data,
+                                       SMTO_ABORTIFHUNG | SMTO_BLOCK, 5000, &result );
+    free( p_data );
+    return sent != 0 && result == TRUE;
+}
+
 void system_Configure( libvlc_int_t *p_this, int i_argc, const char *const ppsz_argv[] )
 {
 #if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
@@ -76,91 +124,81 @@ void system_Configure( libvlc_int_t *p_this, int i_argc, const char *const ppsz_
      || ( var_InheritBool( p_this, "one-instance-when-started-from-file" )
        && var_InheritBool( p_this, "started-from-file" ) ) )
     {
-        HANDLE hmutex;
-
         msg_Info( p_this, "one instance mode ENABLED");
 
-        /* Use a named mutex to check if another instance is already running */
-        if( !( hmutex = CreateMutex( 0, TRUE, L"VLCFlix ipc " TEXT(VERSION) ) ) )
+        /* flix: the mutex lives exactly as long as the process that created it, the
+         * IPC window only as long as its interface. An instance that is closing has
+         * already lost the window but still holds the mutex (and the media library).
+         * This used to give up right there and start a full second instance, which
+         * then fought the closing one for the library database - and a closing
+         * instance that hung kept doing that to every later launch, double-clicks
+         * included. Now a launch waits for such an instance to be gone (the front end
+         * makes sure that takes seconds, see bin/winvlc.c), then takes over. */
+        const vlc_tick_t deadline = vlc_tick_now() + VLC_TICK_FROM_SEC(20);
+        bool waited = false;
+
+        for( ;; )
         {
-            /* Failed for some reason. Just ignore the option and go on as
-             * normal. */
-            msg_Err( p_this, "one instance mode DISABLED "
-                     "(mutex couldn't be created)" );
-            return;
-        }
-
-        if( GetLastError() != ERROR_ALREADY_EXISTS )
-        {
-            libvlc_InternalAddIntf( p_this, "win_msg,none" );
-            /* Initialization done.
-             * Release the mutex to unblock other instances */
-            ReleaseMutex( hmutex );
-        }
-        else
-        {
-            /* Another instance is running */
-
-            HWND ipcwindow;
-
-            /* Wait until the 1st instance is initialized */
-            WaitForSingleObject( hmutex, INFINITE );
-
-            /* Locate the window created by the IPC helper thread of the
-             * 1st instance */
-            if( !( ipcwindow = FindWindow( 0, L"VLCFlix ipc " TEXT(VERSION) ) ) )
+            /* Use a named mutex to check if another instance is already running */
+            HANDLE hmutex = CreateMutex( 0, TRUE, VLC_IPC_NAME );
+            if( hmutex == NULL )
             {
+                /* Failed for some reason. Just ignore the option and go on as
+                 * normal. */
                 msg_Err( p_this, "one instance mode DISABLED "
-                         "(couldn't find 1st instance of program)" );
-                ReleaseMutex( hmutex );
+                         "(mutex couldn't be created)" );
                 return;
             }
 
-            /* We assume that the remaining parameters are filenames
-             * and their input options */
-            if( i_argc > 0 )
+            if( GetLastError() != ERROR_ALREADY_EXISTS )
             {
-                COPYDATASTRUCT wm_data;
-                int i_opt;
-                vlc_ipc_data_t *p_data;
-                size_t i_data = sizeof (*p_data);
-
-                for( i_opt = 0; i_opt < i_argc; i_opt++ )
-                {
-                    i_data += sizeof (size_t);
-                    i_data += strlen( ppsz_argv[ i_opt ] ) + 1;
-                }
-
-                p_data = malloc( i_data );
-                p_data->argc = i_argc;
-                p_data->enqueue = var_InheritBool( p_this, "playlist-enqueue" );
-                i_data = 0;
-                for( i_opt = 0; i_opt < i_argc; i_opt++ )
-                {
-                    size_t i_len = strlen( ppsz_argv[ i_opt ] ) + 1;
-                    memcpy( &p_data->data[i_data], &i_len, sizeof (size_t) );
-                    i_data += sizeof (size_t);
-                    memcpy( &p_data->data[i_data], ppsz_argv[ i_opt ], i_len );
-                    i_data += i_len;
-                }
-                i_data += sizeof (*p_data);
-
-                /* Send our playlist items to the 1st instance */
-                wm_data.dwData = 0;
-                wm_data.cbData = i_data;
-                wm_data.lpData = p_data;
-                SendMessage( ipcwindow, WM_COPYDATA, 0, (LPARAM)&wm_data );
+                if( waited )
+                    msg_Info( p_this, "previous instance is gone, taking over" );
+                libvlc_InternalAddIntf( p_this, "win_msg,none" );
+                /* Initialization done.
+                 * Release the mutex to unblock other instances */
+                ReleaseMutex( hmutex );
+                return; /* the handle stays open for the life of the process */
             }
 
-            /* Initialization done.
-             * Release the mutex to unblock other instances */
-            ReleaseMutex( hmutex );
+            /* Another instance is running: wait until it is initialized */
+            DWORD wait = WaitForSingleObject( hmutex, 5000 );
+            bool owned = wait == WAIT_OBJECT_0 || wait == WAIT_ABANDONED;
 
-            /* Bye bye */
-            system_End( );
-            exit( 0 );
+            /* Locate the window created by the IPC helper thread of the
+             * 1st instance */
+            HWND ipcwindow = owned ? FindWindow( 0, VLC_IPC_NAME ) : NULL;
+            if( ipcwindow != NULL
+             && SendToRunningInstance( p_this, ipcwindow, i_argc, ppsz_argv ) )
+            {
+                /* Initialization done.
+                 * Release the mutex to unblock other instances */
+                ReleaseMutex( hmutex );
+                CloseHandle( hmutex );
+
+                /* Bye bye */
+                system_End( );
+                exit( 0 );
+            }
+
+            if( owned )
+                ReleaseMutex( hmutex );
+            CloseHandle( hmutex );
+
+            if( vlc_tick_now() >= deadline )
+            {
+                msg_Err( p_this, "one instance mode DISABLED "
+                         "(the previous instance did not close)" );
+                return;
+            }
+            if( !waited )
+                msg_Info( p_this, "waiting for the previous instance to close" );
+            waited = true;
+            Sleep( 200 );
         }
     }
+#else
+    VLC_UNUSED(p_this); VLC_UNUSED(i_argc); VLC_UNUSED(ppsz_argv);
 #endif
 }
 

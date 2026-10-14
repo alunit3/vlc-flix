@@ -547,10 +547,15 @@ Widgets.PageLoader {
 
                         Text {
                             text: page.waiting ? qsTr("Searching…")
-                                : page.failed ? qsTr("Could not reach TMDB. Check your access token and connection in Preferences.")
+                                : page.failed ? qsTr("Could not reach TMDB. Check your connection, and the token in <a href=\"flix:accounts\">VLCFlix settings › Accounts</a>.")
                                 : qsTr("No results.")
                             color: "#B3B3B3"
                             font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
+                            textFormat: Text.StyledText
+                            linkColor: "#FFFFFF"
+                            onLinkActivated: MainCtx.openFlixSettings("accounts")
+
+                            HoverHandler { cursorShape: parent.hoveredLink !== "" ? Qt.PointingHandCursor : Qt.ArrowCursor }
                         }
                     }
 

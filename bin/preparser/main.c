@@ -523,9 +523,16 @@ int main(int argc, char **argv)
         return ret == 0 ? 0 : 1;
     }
 
+    /* flix: this is a helper, never a second VLCFlix. libvlc_new() goes through the
+     * one-instance check (on by default in VLCFlix): it found the running player's
+     * mutex, handed it an empty command line and exit(0)ed - so every parse request
+     * came back as a generic error, and the library gave up on the files. The fork's
+     * default interfaces (the FlixSubs Lua service) and the media library have no
+     * business in here either. */
     const char *libvlc_args[] = {
         "--verbose", args.verbosity, "--vout=vdummy", "--aout=adummy",
         "--text-renderer=tdummy",
+        "--no-one-instance", "--extraintf=", "--control=", "--no-media-library",
     };
 
     libvlc_instance_t *vlc = libvlc_new(ARRAY_SIZE(libvlc_args), libvlc_args);

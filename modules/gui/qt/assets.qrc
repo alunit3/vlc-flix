@@ -1,11 +1,17 @@
 <RCC>
     <qresource prefix="/logo">
         <file alias="vlc256.png">../../../share/icons/256x256/vlc.png</file>
+        <file alias="vlc256-xmas.png">../../../share/icons/256x256/vlc-xmas.png</file>
+        <file alias="vlc256-halloween.png">../../../share/icons/256x256/vlc-halloween.png</file>
         <file alias="vlc128.png">../../../share/icons/128x128/vlc.png</file>
-        <file alias="vlc16.png">../../../share/icons/16x16/vlc.png</file>
-        <file alias="vlc48.png">../../../share/icons/48x48/vlc.png</file>
         <file alias="vlc128-xmas.png">../../../share/icons/128x128/vlc-xmas.png</file>
+        <file alias="vlc128-halloween.png">../../../share/icons/128x128/vlc-halloween.png</file>
+        <file alias="vlc48.png">../../../share/icons/48x48/vlc.png</file>
         <file alias="vlc48-xmas.png">../../../share/icons/48x48/vlc-xmas.png</file>
+        <file alias="vlc48-halloween.png">../../../share/icons/48x48/vlc-halloween.png</file>
+        <file alias="vlc16.png">../../../share/icons/16x16/vlc.png</file>
+        <file alias="vlc16-xmas.png">../../../share/icons/16x16/vlc-xmas.png</file>
+        <file alias="vlc16-halloween.png">../../../share/icons/16x16/vlc-halloween.png</file>
         <file alias="vlc128-aprilfools.png">../../../share/icons/128x128/vlc-aprilfools.png</file>
         <file alias="vlc48-aprilfools.png">../../../share/icons/48x48/vlc-aprilfools.png</file>
         <file alias="vlc128-kb.png">../../../share/icons/128x128/vlc-kb.png</file>

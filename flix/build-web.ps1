@@ -1,11 +1,14 @@
 # Builds the web player helper (flix/web, Go + Microsoft Edge WebView2) into <run>\flix\flixweb.exe.
-#   ./flix/build-web.ps1
+#   ./flix/build-web.ps1 [-Out <run tree>\flix]
 # Needs Go 1.22+. At run time Windows needs the WebView2 runtime (part of Windows 11 / Edge).
+# The player looks for it in flix\ next to vlcflix.exe and opens the browser instead when it is
+# not there, so it has to land in the tree that is run: dev.ps1 passes -Out for its -RunDir.
+param([string]$Out = "")
 $ErrorActionPreference = "Stop"
 
 $src  = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $root = Split-Path $src -Parent
-$out  = Join-Path $root "run\flix"
+$out  = if ($Out) { $Out } else { Join-Path $root "run\flix" }
 New-Item -ItemType Directory -Force $out | Out-Null
 
 if (-not (Get-Command go -ErrorAction SilentlyContinue)) {

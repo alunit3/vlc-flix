@@ -577,6 +577,25 @@ public:
 static void *Thread( void * );
 static void *ThreadCleanup( qt_intf_t *p_intf, CleanupReason cleanupReason );
 
+#ifdef _WIN32
+/* flix: the UI thread must not end. When it does, the C runtime runs its thread_local
+ * destructors from the thread-detach callback, and Qt's animation timer
+ * (QUnifiedTimer) is destroyed there after the Qt state it uses is gone. That crashed
+ * on every close, under the loader lock - which is how a closed VLCFlix could stay
+ * behind, idle, holding the library and the one-instance mutex. So once Qt is fully
+ * torn down the thread reports that it is done and waits for the process to end;
+ * bin/winvlc.c ends it with TerminateProcess, which runs no detach code at all. */
+static void *ThreadParked( void *obj )
+{
+    qt_intf_t *p_intf = static_cast<qt_intf_t *>( obj );
+    Thread( obj );
+    vlc_sem_post( &p_intf->wait_quit );
+    for( ;; )
+        Sleep( INFINITE );
+    return NULL;
+}
+#endif
+
 #ifdef Q_OS_MAC
 /* Used to abort the app.exec() on OSX after libvlc_Quit is called */
 #include <CoreFoundation/CFRunLoop.h>
@@ -640,6 +659,11 @@ static int OpenInternal( qt_intf_t *p_intf )
         vlc_sem_post(&p_intf->wait_quit);
     });
     CFRunLoopWakeUp(CFRunLoopGetMain());
+#elif defined(_WIN32)
+    if( vlc_clone( &p_intf->thread, ThreadParked, p_intf ) )
+    {
+        return VLC_ENOMEM;
+    }
 #else
     if( vlc_clone( &p_intf->thread, Thread, p_intf ) )
     {
@@ -655,7 +679,9 @@ static int OpenInternal( qt_intf_t *p_intf )
 
     if (open_state == OPEN_STATE_ERROR)
     {
-#ifndef Q_OS_MAC
+#if defined(_WIN32)
+        vlc_sem_wait(&p_intf->wait_quit);
+#elif !defined(Q_OS_MAC)
         vlc_join (p_intf->thread, NULL);
 #endif
         return VLC_EGENERIC;
@@ -674,10 +700,10 @@ static void CloseInternal( qt_intf_t *p_intf )
     triggerQuit();
 
     msg_Dbg( p_intf, "waiting for UI thread..." );
-#ifndef Q_OS_MAC
-    vlc_join (p_intf->thread, NULL);
-#else
+#if defined(Q_OS_MAC) || defined(_WIN32)
     vlc_sem_wait(&p_intf->wait_quit);
+#else
+    vlc_join (p_intf->thread, NULL);
 #endif
 
 
@@ -898,6 +924,18 @@ static void *Thread( void *obj )
     auto compositor = var_InheritString(p_intf, "qt-compositor");
     vlc::CompositorFactory compositorFactory(p_intf, compositor);
     free(compositor);
+
+#ifdef _WIN32
+    /* flix: render the interface on the UI thread. Qt Quick's own render thread
+     * (QSGRenderThread) crashed every time it ended, in the thread_local destructor of
+     * its animation timer (QUnifiedTimer) - the MinGW runtime frees that storage before
+     * the destructor runs. A crash at every close, under the loader lock, is where the
+     * closed-but-still-running VLCFlix came from. Video is not drawn by the scene graph,
+     * so only the interface itself is rendered differently. QSG_RENDER_LOOP set in the
+     * environment still wins. */
+    if( !qEnvironmentVariableIsSet( "QSG_RENDER_LOOP" ) )
+        qputenv( "QSG_RENDER_LOOP", QByteArrayLiteral("basic") );
+#endif
 
     // at the moment, the vout is created in another thread than the rendering thread
     QApplication::setAttribute( Qt::AA_DontCheckOpenGLContextThreadAffinity );
@@ -1274,10 +1312,7 @@ static void *Thread( void *obj )
     app.setApplicationDisplayName( qtr("VLCFlix") );
     app.setApplicationVersion( QString::fromUtf8(VERSION_MESSAGE) );
 
-    if( QDate::currentDate().dayOfYear() >= QT_XMAS_JOKE_DAY && var_InheritBool( p_intf, "qt-icon-change" ) )
-        app.setWindowIcon( QIcon::fromTheme( "vlc-xmas", QIcon( ":/logo/vlc128-xmas.png" ) ) );
-    else
-        app.setWindowIcon( QIcon::fromTheme( "vlc", QIcon( ":/logo/vlc256.png" ) ) );
+    app.setWindowIcon( QIcon( QStringLiteral(":/logo/vlc256%1.png").arg( MainCtx::logoSuffix( p_intf ) ) ) );
 
     app.setDesktopFileName( PACKAGE );
 

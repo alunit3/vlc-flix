@@ -158,10 +158,4 @@ static inline QString QVLCUserDir( vlc_userdir_t type )
     return res;
 }
 
-/* After this day of the year, the usual VLC cone is replaced by another cone
- * wearing a Father Xmas hat.
- * Note this icon doesn't represent an endorsment of Coca-Cola company.
- */
-#define QT_XMAS_JOKE_DAY 354
-
 #endif

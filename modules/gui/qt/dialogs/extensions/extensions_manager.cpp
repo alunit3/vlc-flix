@@ -135,6 +135,21 @@ void ExtensionsManager::menu( QMenu *current )
     {
         bool b_Active = extension_IsActivated( p_extensions_manager, p_ext );
 
+        /* flix: FlixSubs is the window behind "Find Subtitles Online..." everywhere
+         * else. Listed the generic way it was an "activate" checkbox named FlixSubs
+         * that turned into a submenu with "Deactivate" - nothing said it was the same
+         * thing. Give it the same name and make it simply open the window. */
+        const char *name = p_ext->psz_shortdescription ? p_ext->psz_shortdescription
+                                                       : p_ext->psz_title;
+        if( name && !strcmp( name, "FlixSubs" ) )
+        {
+            action = current->addAction( qtr( "Find Subtitles Online..." ) );
+            connect( action, &QAction::triggered, this, &ExtensionsManager::openVLsub,
+                     Qt::QueuedConnection );
+            i_ext++;
+            continue;
+        }
+
         if( b_Active && extension_HasMenu( p_extensions_manager, p_ext ) )
         {
             QMenu *submenu = new QMenu(

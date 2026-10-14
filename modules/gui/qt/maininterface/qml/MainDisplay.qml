@@ -89,6 +89,14 @@ FocusScope {
             History.update(["home"])
         }
         loadCurrentHistoryView(Qt.OtherFocusReason)
+
+        // flix: the first-run welcome; it decides itself whether there is anything to
+        // show (an existing library or token marks it done without a word)
+        if (MainCtx.mediaLibraryAvailable
+                && String(MainCtx.flixPref("onboarding/done", "0")) !== "1") {
+            welcomeLoader.active = true
+            welcomeLoader.item.start(false)
+        }
     }
 
     Navigation.cancelAction: function() {
@@ -115,6 +123,43 @@ FocusScope {
         source: "qrc:///qt/qml/VLC/MediaLibrary/FlixSettingsPage.qml"
     }
 
+    // VLCFlix: first-run welcome (folder, TMDB, OpenSubtitles); "Run setup again" in the
+    // settings brings it back
+    Loader {
+        id: welcomeLoader
+
+        active: false
+        anchors.fill: parent
+        z: 1100
+        source: "qrc:///qt/qml/VLC/MediaLibrary/FlixWelcome.qml"
+    }
+
+    Connections {
+        target: welcomeLoader.item
+        ignoreUnknownSignals: true
+
+        function onFinished() {
+            welcomeLoader.active = false
+        }
+    }
+
+    Connections {
+        target: MainCtx
+
+        // any page can ask for a settings section ("Manage folders", "Connect TMDB"...)
+        function onFlixSettingsRequested(section) {
+            storageLoader.active = true
+            storageLoader.item.open(section)
+        }
+
+        function onWelcomeRequested() {
+            if (storageLoader.item)
+                storageLoader.item.close()
+            welcomeLoader.active = true
+            welcomeLoader.item.start(true)
+        }
+    }
+
     readonly property var pageModel: [
         {
             name: "home",
@@ -139,11 +184,12 @@ FocusScope {
             name: "discover",
             url: "qrc:///qt/qml/VLC/Network/DiscoverDisplay.qml"
         }, {
-            // flix: upstream's MLFoldersSettings.qml is not part of this build, and
-            // nothing could navigate to "mlsettings" anyway. The library folders live
-            // on the Settings page under VLCFlix > Storage.
+            // flix: upstream's MLFoldersSettings.qml is not part of this build. The
+            // library folders are managed in the VLCFlix settings, "Library & metadata"
+            // (MainCtx.openFlixSettings("library")); the settings page is an overlay,
+            // not a page, so nothing routes here.
             name: "mlsettings",
-            url: "qrc:///qt/qml/VLC/MediaLibrary/FlixSettingsPage.qml"
+            url: "qrc:///qt/qml/VLC/MediaLibrary/HomeDisplay.qml"
         }
     ]
 

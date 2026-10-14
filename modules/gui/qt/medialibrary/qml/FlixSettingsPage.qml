@@ -323,104 +323,11 @@ Item {
         ml: MediaLib
     }
 
-    component Btn: Rectangle {
-        id: btn
+    // the button and the text box are shared with the welcome flow (FlixButton.qml,
+    // FlixField.qml)
+    component Btn: FlixButton {}
 
-        property string text
-        property bool primary: false
-        property bool danger: false
-
-        signal clicked()
-
-        width: btnLabel.implicitWidth + 2 * VLCStyle.dp(18, VLCStyle.scale)
-        height: VLCStyle.dp(34, VLCStyle.scale)
-        radius: VLCStyle.dp(4, VLCStyle.scale)
-        opacity: enabled ? 1.0 : 0.4
-        color: danger ? (btnHover.hovered ? "#F6121D" : "#E50914")
-                      : primary ? (btnHover.hovered ? "#BFBFBF" : "#FFFFFF")
-                                : (btnHover.hovered ? Qt.rgba(0.43, 0.43, 0.45, 0.55) : Qt.rgba(0.43, 0.43, 0.45, 0.7))
-        scale: btnTap.pressed ? 0.96 : 1.0
-
-        Behavior on color { ColorAnimation { duration: 160 } }
-        Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
-
-        Text {
-            id: btnLabel
-
-            anchors.centerIn: parent
-            text: btn.text
-            color: (btn.primary && !btn.danger) ? "#141414" : "#FFFFFF"
-            font.pixelSize: VLCStyle.dp(14, VLCStyle.scale)
-            font.weight: Font.Bold
-        }
-
-        HoverHandler { id: btnHover; cursorShape: Qt.PointingHandCursor }
-        TapHandler { id: btnTap; gesturePolicy: TapHandler.ReleaseWithinBounds; onTapped: btn.clicked() }
-    }
-
-    // a text box with a label and a hint; secret fields show dots
-    component Field: Column {
-        id: field
-
-        property string label
-        property string hint
-        property string placeholder
-        property bool secret: false
-        property alias text: input.text
-
-        signal committed()
-
-        width: parent ? parent.width : 0
-        spacing: VLCStyle.dp(6, VLCStyle.scale)
-
-        Text {
-            text: field.label
-            color: "#FFFFFF"
-            font.pixelSize: VLCStyle.dp(14, VLCStyle.scale)
-            font.weight: Font.DemiBold
-        }
-
-        Rectangle {
-            width: parent.width
-            height: VLCStyle.dp(40, VLCStyle.scale)
-            radius: VLCStyle.dp(4, VLCStyle.scale)
-            color: "#1F1F1F"
-            border.color: input.activeFocus ? "#FFFFFF" : "#4D4D4D"
-
-            TextInput {
-                id: input
-
-                anchors.fill: parent
-                anchors.leftMargin: VLCStyle.dp(12, VLCStyle.scale)
-                anchors.rightMargin: VLCStyle.dp(12, VLCStyle.scale)
-                verticalAlignment: TextInput.AlignVCenter
-                color: "#FFFFFF"
-                selectionColor: "#E50914"
-                font.pixelSize: VLCStyle.dp(14, VLCStyle.scale)
-                clip: true
-                echoMode: field.secret ? TextInput.Password : TextInput.Normal
-                passwordCharacter: "•"
-                onEditingFinished: field.committed()
-
-                Text {
-                    visible: input.text === "" && !input.activeFocus
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: field.placeholder
-                    color: "#808080"
-                    font: input.font
-                }
-            }
-        }
-
-        Text {
-            visible: field.hint !== ""
-            width: parent.width
-            text: field.hint
-            color: "#808080"
-            font.pixelSize: VLCStyle.dp(12, VLCStyle.scale)
-            wrapMode: Text.WordWrap
-        }
-    }
+    component Field: FlixField {}
 
     // an on / off switch with a label
     component Toggle: Item {
@@ -771,7 +678,7 @@ Item {
                     label: qsTr("TMDB access token")
                     secret: true
                     placeholder: root.tmdbSaved ? qsTr("A token is saved (hidden). Type a new one to replace it.") : qsTr("Paste your TMDB read access token")
-                    hint: qsTr("Free at themoviedb.org/settings/api. Needed for posters, synopses, search and the Top 10.")
+                    hint: qsTr("Free at <a href=\"https://www.themoviedb.org/settings/api\">themoviedb.org/settings/api</a>: the long \"API Read Access Token\". Needed for posters, synopses, search and the Top 10.")
                 }
 
                 Row {
@@ -789,12 +696,17 @@ Item {
 
                 Rectangle { width: parent.width; height: 1; color: "#333333" }
 
+                Note {
+                    text: qsTr("OpenSubtitles needs both: the <b>API key</b> identifies VLCFlix and is enough to search; your <b>username and password</b> are needed to download, and the daily download allowance belongs to that account.")
+                    textFormat: Text.StyledText
+                }
+
                 Field {
                     id: osKeyField
 
                     label: qsTr("OpenSubtitles API key")
                     placeholder: qsTr("API consumer key")
-                    hint: qsTr("Create a consumer at opensubtitles.com/consumers.")
+                    hint: qsTr("Create a consumer at <a href=\"https://www.opensubtitles.com/consumers\">opensubtitles.com/consumers</a>. No account yet? <a href=\"https://www.opensubtitles.com/users/sign_up\">Sign up</a>.")
                 }
 
                 Field { id: osUserField; label: qsTr("OpenSubtitles username"); placeholder: qsTr("Username") }
@@ -819,6 +731,12 @@ Item {
                         font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
                     }
                 }
+
+                Rectangle { width: parent.width; height: 1; color: "#333333" }
+
+                Note { text: qsTr("The welcome steps from the first start: movie folder, TMDB and OpenSubtitles, one at a time.") }
+
+                Btn { text: qsTr("Run setup again"); onClicked: MainCtx.openWelcome() }
             }
 
             // ---- library & metadata ----
@@ -827,6 +745,21 @@ Item {
                 current: root.section === "library"
 
                 Heading { text: qsTr("Library & metadata") }
+
+                Text {
+                    text: qsTr("Library folders")
+                    color: "#FFFFFF"
+                    font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
+                    font.weight: Font.Bold
+                }
+
+                Note {
+                    text: qsTr("VLCFlix builds the library from these folders and their sub-folders. Removing one takes its films out of the library; the files stay on your disk.")
+                }
+
+                FlixFolderList {}
+
+                Rectangle { width: parent.width; height: 1; color: "#333333" }
 
                 Choice {
                     label: qsTr("Synopsis and title language")

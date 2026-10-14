@@ -185,11 +185,15 @@ SDDirectory::requestMetadataSync(input_item_t *media,
     while (req.probe == false) {
         req.cond.wait(req.lock);
     }
-    if (req.status == VLC_ETIMEOUT) {
+    if (req.status == VLC_ETIMEOUT || req.status == -ETIMEDOUT) {
             throw medialibrary::fs::errors::System(
                 ETIMEDOUT, "Failed to browse directory: Operation timed out" );
     }
-    return req.status == VLC_SUCCESS;
+    /* flix: a failed listing used to come back as "Unknown error", saying nothing */
+    if ( req.status != VLC_SUCCESS )
+        throw medialibrary::fs::errors::System(
+            EIO, "Failed to browse directory: preparser status " + std::to_string( req.status ) );
+    return true;
 }
 
 void

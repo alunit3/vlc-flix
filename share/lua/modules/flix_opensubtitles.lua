@@ -322,6 +322,10 @@ function M.save(body, directories, stem, language, id)
     local name = M.safe_name(stem) .. "." .. M.safe_name(language)
     for _, directory in ipairs(directories) do
         if directory and directory ~= "" then
+            -- the user's subtitles folder does not exist until something creates it, and a
+            -- stream has no folder of its own, so a first download used to fail here with
+            -- "Could not save the subtitle file" (an existing folder is left as it is)
+            pcall(vlc.io.mkdir, directory, "0700")
             for index = 1, 100 do
                 local suffix = index == 1 and "" or ("." .. tostring(id) .. "." .. index)
                 local path = directory:gsub("[\\/]+$", "") .. "/" .. name .. suffix .. ".srt"

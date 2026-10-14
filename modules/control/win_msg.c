@@ -50,6 +50,12 @@ typedef struct
     char data[];
 } vlc_ipc_data_t;
 
+/* Must be same as in bin/winvlc.c. flix: sent by the front end once a quit was asked
+ * for. The window drops its title, so a launch from then on no longer finds it and
+ * waits for this process to end instead of handing its files to an instance that is
+ * going away (see src/win32/specific.c). */
+#define VLC_IPC_RETIRE (WM_APP + 0x564C)
+
 static void add_to_playlist(intf_thread_t *intf, const char *uri,
                             bool play_now, int options_count,
                             const char *const *options)
@@ -75,6 +81,11 @@ static LRESULT CALLBACK WMCOPYWNDPROC(HWND hwnd, UINT uMsg,
     if( uMsg == WM_QUIT  )
     {
         PostQuitMessage( 0 );
+    }
+    else if( uMsg == VLC_IPC_RETIRE )
+    {
+        SetWindowTextW( hwnd, L"" );
+        return 0;
     }
     else if( uMsg == WM_COPYDATA )
     {
@@ -127,7 +138,15 @@ static LRESULT CALLBACK WMCOPYWNDPROC(HWND hwnd, UINT uMsg,
             }
 
             free( ppsz_argv );
+
+            /* flix: a second launch with nothing to open (the icon clicked again)
+             * used to vanish without a trace, so it looked as if nothing happened
+             * and got clicked again. Bring the running window forward instead. */
+            if( i_argc == 0 )
+                var_TriggerCallback( vlc_object_instance(intf), "intf-show" );
         }
+        /* tells the sender it was delivered (DefWindowProc answers FALSE) */
+        return TRUE;
     }
 
     return DefWindowProc( hwnd, uMsg, wParam, lParam );

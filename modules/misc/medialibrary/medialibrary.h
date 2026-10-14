@@ -105,6 +105,7 @@ private:
                                     size_t count, void *data );
 
 private:
+    vlc_object_t* m_obj;
     vlc::threads::condition_variable m_cond;
     vlc::threads::mutex m_mutex;
     ParseContext* m_currentCtx;
@@ -143,6 +144,7 @@ class MediaLibrary : public medialibrary::IMediaLibraryCb
 {
 public:
     static MediaLibrary* create( vlc_medialibrary_module_t* ml );
+    ~MediaLibrary();
 
     bool Init();
     int Control( int query, va_list args );
@@ -188,6 +190,11 @@ private:
     bool m_initialized = false; /* protected by m_mutex */
 
     std::atomic_flag m_started = ATOMIC_FLAG_INIT;
+
+    /* flix: network share discovery, started off the startup path (see Init()) */
+    static void* enableNetworkDiscovery( void* data );
+    vlc_thread_t m_networkThread;
+    bool m_networkThreadStarted = false; /* protected by m_mutex */
 
     // IMediaLibraryCb interface
 public:

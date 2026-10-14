@@ -104,6 +104,16 @@ Widgets.PageExt {
     Component.onCompleted: {
         _refreshHero()
         _refreshUpdate()
+
+        // a folder picked while the library could not be opened (FlixNoMedialib.qml)
+        const pending = String(MainCtx.flixPref("library/pending", ""))
+        if (pending !== "") {
+            MainCtx.setFlixPref("library/pending", "")
+            const picked = decodeURIComponent(pending).replace(/\/$/, "")
+            root.folderPending = picked.substring(picked.lastIndexOf("/") + 1)
+            folderPendingTimer.restart()
+            libraryFolders.add(pending)
+        }
     }
 
     Connections {
@@ -129,9 +139,6 @@ Widgets.PageExt {
         }
     }
 
-    // flix: adding a folder used to fail silently - the model reports it through
-    // operationFailed and nothing here listened, so picking a folder that the library
-    // refused just did nothing and looked broken
     // a newer VLCFlix release ({version, url}, from the Lua service), unless that version was
     // waved away with "Not now"
     // ("update" would collide with Item.update())
@@ -145,6 +152,9 @@ Widgets.PageExt {
         function onUpdateChanged() { root._refreshUpdate() }
     }
 
+    // flix: adding a folder used to fail silently - the model reports it through
+    // operationFailed and nothing here listened, so picking a folder that the library
+    // refused just did nothing and looked broken
     property string folderError: ""
     property string folderErrorUrl: ""
 

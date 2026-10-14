@@ -4,13 +4,14 @@
 #   ./flix/dev.ps1 -Launch    ...and start VLCFlix in portable mode (-I qt)
 #   ./flix/dev.ps1 -ResetLayout   forget the saved control bar layout (needed after changing the default layout)
 #   ./flix/dev.ps1 -NoMigrate     do not carry the old portable\vlc settings over
-param([switch]$Launch, [switch]$ResetLayout, [switch]$NoMigrate, [int]$Jobs = 2, [string]$Media = "")
+#   ./flix/dev.ps1 -RunDir run-new   install into another run tree next to the source
+param([switch]$Launch, [switch]$ResetLayout, [switch]$NoMigrate, [int]$Jobs = 2, [string]$Media = "", [string]$RunDir = "run")
 $ErrorActionPreference = "Stop"
 
 $image = "registry.videolan.org/vlc-debian-win64-posix:20260611225331"
 $src   = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $root  = Split-Path $src -Parent
-$run   = Join-Path $root "run"
+$run   = Join-Path $root $RunDir
 
 # The program was renamed to vlcflix, so its settings folder moved with it:
 # run\portable\vlc -> run\portable\VLCFlix, and vlc-qt-interface.ini ->
@@ -95,6 +96,14 @@ MM=modules/.libs/libmmdevice_plugin.dll
 WA=modules/.libs/libwasapi_plugin.dll
 [ -f "`$WA" ] || WA=`$(find . -name libwasapi_plugin.dll -not -path "./vlc-*" -not -path "./_win32/*" | head -1)
 [ -n "`$WA" ] && x86_64-w64-mingw32-strip --strip-unneeded -o /out/libwasapi_plugin.dll.new "`$WA"
+# the media library (network discovery off the startup path, folders listed in-process)
+# and the one-instance IPC window (raise on relaunch, retired on quit)
+ML=modules/.libs/libmedialibrary_plugin.dll
+[ -f "`$ML" ] || ML=`$(find . -name libmedialibrary_plugin.dll -not -path "./vlc-*" -not -path "./_win32/*" | head -1)
+[ -n "`$ML" ] && x86_64-w64-mingw32-strip --strip-unneeded -o /out/libmedialibrary_plugin.dll.new "`$ML"
+WM=modules/.libs/libwin_msg_plugin.dll
+[ -f "`$WM" ] || WM=`$(find . -name libwin_msg_plugin.dll -not -path "./vlc-*" -not -path "./_win32/*" | head -1)
+[ -n "`$WM" ] && x86_64-w64-mingw32-strip --strip-unneeded -o /out/libwin_msg_plugin.dll.new "`$WM"
 
 # The exe carries the icon and the version resource, so it has to come across too.
 # The one to ship is bin/vlcflix-static.exe: the top level vlcflix is a symlink to it,
@@ -107,8 +116,10 @@ WA=modules/.libs/libwasapi_plugin.dll
 # threw on the move that followed, so run\ kept a stale copy and a pile of .old files.
 rm -f _win32/bin/vlc.exe
 cp -f bin/vlcflix-static.exe /out/vlcflix.exe.new
-test -f _win32/bin/vlc-cache-gen.exe && cp -f _win32/bin/vlc-cache-gen.exe /out/ || true
-test -f bin/vlc-cache-gen.exe && cp -f bin/vlc-cache-gen.exe /out/ || true
+# the helpers the player starts. bin/*.exe are 60 KB libtool wrappers; the programs
+# themselves are in bin/.libs. vlc-preparser.exe parses and thumbnails library files.
+x86_64-w64-mingw32-strip --strip-unneeded -o /out/vlc-preparser.exe.new bin/.libs/vlc-preparser.exe
+x86_64-w64-mingw32-strip --strip-unneeded -o /out/vlc-cache-gen.exe.new bin/.libs/vlc-cache-gen.exe
 # the installer and the desktop shortcuts read the icon out of the run tree.
 # Absolute: the shell is sitting in /build/win64 at this point.
 cp -f /vlc/share/icons/vlc.ico /out/vlc.ico
@@ -135,7 +146,17 @@ if (Test-Path (Join-Path $run "libwasapi_plugin.dll.new")) {
 if (Test-Path (Join-Path $run "libmmdevice_plugin.dll.new")) {
     Install-Built (Join-Path $run "libmmdevice_plugin.dll.new") (Join-Path $run ("plugins" + [IO.Path]::DirectorySeparatorChar + "audio_output" + [IO.Path]::DirectorySeparatorChar + "libmmdevice_plugin.dll"))
 }
+foreach ($p in @(@("libmedialibrary_plugin.dll", "misc"), @("libwin_msg_plugin.dll", "control"))) {
+    $new = Join-Path $run ($p[0] + ".new")
+    if (Test-Path $new) {
+        Install-Built $new (Join-Path $run ("plugins" + [IO.Path]::DirectorySeparatorChar + $p[1] + [IO.Path]::DirectorySeparatorChar + $p[0]))
+    }
+}
 Install-Built (Join-Path $run "liblua_plugin.dll.new") (Join-Path $run ("plugins" + [IO.Path]::DirectorySeparatorChar + "lua" + [IO.Path]::DirectorySeparatorChar + "liblua_plugin.dll"))
+foreach ($exe in @("vlc-preparser.exe", "vlc-cache-gen.exe")) {
+    $new = Join-Path $run ($exe + ".new")
+    if (Test-Path $new) { Install-Built $new (Join-Path $run $exe) }
+}
 # and the executable, which holds the window/exe icon
 if (Test-Path (Join-Path $run "vlcflix.exe.new")) {
     try { Install-Built (Join-Path $run "vlcflix.exe.new") (Join-Path $run "vlcflix.exe") }
@@ -160,25 +181,35 @@ foreach ($rel in @("intf/flixsubs.lua", "modules/flix_opensubtitles.lua", "modul
     $to = Join-Path $run ("lua/" + $rel)
     New-Item -ItemType Directory -Force (Split-Path $to) | Out-Null
     Copy-Item (Join-Path $src ("share/lua/" + $rel)) $to -Force
+    # VLC loads X.luac before X.lua, so a compiled copy left from a packaged build silently
+    # wins over the fresh source copied above (and for an extension, both were listed)
+    Remove-Item ($to + "c") -Force -ErrorAction SilentlyContinue
+}
+# VLSub is the old VLC extension (retired opensubtitles.org API), no longer part of VLCFlix.
+foreach ($stale in @("VLSub.luac", "VLSub.lua")) {
+    Remove-Item (Join-Path $run ("lua/extensions/" + $stale)) -Force -ErrorAction SilentlyContinue
 }
 
 # the torrent helper (Go): rebuilt when its sources are newer than the installed exe
 $helper = Join-Path $run "flix\flixtorrent.exe"
 $newest = Get-ChildItem (Join-Path $PSScriptRoot "torrent") -Include *.go,go.mod -Recurse | Sort-Object LastWriteTime | Select-Object -Last 1
 if ((Get-Command go -ErrorAction SilentlyContinue) -and ((-not (Test-Path $helper)) -or ($newest.LastWriteTime -gt (Get-Item $helper).LastWriteTime))) {
-    & (Join-Path $PSScriptRoot "build-torrent.ps1")
+    & (Join-Path $PSScriptRoot "build-torrent.ps1") -Out (Join-Path $run "flix")
 }
 
 # the web player helper (Go + Edge WebView2), same rule
 $webHelper = Join-Path $run "flix\flixweb.exe"
 $webNewest = Get-ChildItem (Join-Path $PSScriptRoot "web") -Include *.go,go.mod -Recurse | Sort-Object LastWriteTime | Select-Object -Last 1
 if ((Get-Command go -ErrorAction SilentlyContinue) -and ((-not (Test-Path $webHelper)) -or ($webNewest.LastWriteTime -gt (Get-Item $webHelper).LastWriteTime))) {
-    & (Join-Path $PSScriptRoot "build-web.ps1")
+    & (Join-Path $PSScriptRoot "build-web.ps1") -Out (Join-Path $run "flix")
 }
 
 if ($Launch) {
     New-Item -ItemType Directory -Force (Join-Path $run "portable") | Out-Null
-    $a = @("-I", "qt", "--no-one-instance", "--no-qt-privacy-ask", "--no-qt-updates-notif")
+    # One-instance stays on, as in a real install: every vlcflix.exe was closed above, and
+    # a launch while an old one is still closing now waits for it (src/win32/specific.c).
+    # --no-one-instance here is what let a test launch and a double-click run side by side.
+    $a = @("-I", "qt", "--no-qt-privacy-ask", "--no-qt-updates-notif")
     if ($Media) { $a += "`"$Media`"" }
     Start-Process (Join-Path $run "vlcflix.exe") -ArgumentList $a -WorkingDirectory $run
 }

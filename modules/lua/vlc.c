@@ -136,6 +136,13 @@ static int file_compare( const char **a, const char **b )
     return strcmp( *a, *b );
 }
 
+/* Length of a script's name without its .lua/.luac/.vle extension */
+static size_t file_stem_len( const char *file )
+{
+    const char *dot = strrchr( file, '.' );
+    return dot != NULL ? (size_t)(dot - file) : strlen( file );
+}
+
 /* Function to parse the trusted property of a file */
 static bool file_is_playlist( lua_State *L )
 {
@@ -228,15 +235,30 @@ int vlclua_scripts_batch_execute( vlc_object_t *p_this,
 
         char **ppsz_file = ppsz_filelist;
         char **ppsz_fileend = ppsz_filelist + i_files;
+        char *psz_prev = NULL;
 
         while( ppsz_file < ppsz_fileend )
         {
             char *psz_filename;
 
+            /* flix: X.lua and X.luac side by side are the same script - one plain,
+             * one compiled. Both used to run, which put every such extension in the
+             * View menu twice. Sorted, they are neighbours; keep the first. */
+            if( psz_prev != NULL
+             && file_stem_len( psz_prev ) == file_stem_len( *ppsz_file )
+             && !strncmp( psz_prev, *ppsz_file, file_stem_len( psz_prev ) ) )
+            {
+                msg_Dbg( p_this, "Skipping %s, same script as %s",
+                         *ppsz_file, psz_prev );
+                free( *(ppsz_file++) );
+                continue;
+            }
+
             if( asprintf( &psz_filename,
                           "%s" DIR_SEP "%s", *ppsz_dir, *ppsz_file ) == -1 )
                 psz_filename = NULL;
-            free( *(ppsz_file++) );
+            free( psz_prev );
+            psz_prev = *(ppsz_file++);
 
             if( likely(psz_filename != NULL) )
             {
@@ -248,6 +270,7 @@ int vlclua_scripts_batch_execute( vlc_object_t *p_this,
             }
         }
 
+        free( psz_prev );
         while( ppsz_file < ppsz_fileend )
             free( *(ppsz_file++) );
         free( ppsz_filelist );

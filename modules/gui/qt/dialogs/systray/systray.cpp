@@ -39,11 +39,7 @@ VLCSystray::VLCSystray(MainCtx* ctx, QObject* parent)
 
     m_notificationSetting = var_InheritInteger(m_intf, "qt-notification");
 
-    QIcon iconVLC;
-    if( m_ctx->useXmasCone() )
-        iconVLC = QIcon::fromTheme( "vlc-xmas", QIcon( ":/logo/vlc128-xmas.png" ) );
-    else
-        iconVLC = QIcon::fromTheme( "vlc", QIcon( ":/logo/vlc256.png" ) );
+    const QIcon iconVLC( QStringLiteral(":/logo/vlc256%1.png").arg( MainCtx::logoSuffix( m_intf ) ) );
 
     setIcon(iconVLC);
     setToolTip( qtr( "VLC media player" ));

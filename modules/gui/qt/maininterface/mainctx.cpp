@@ -287,7 +287,10 @@ MainCtx::MainCtx(qt_intf_t *_p_intf)
     libvlc_int_t* libvlc = vlc_object_instance(p_intf);
     var_AddCallback( libvlc, "intf-toggle-fscontrol", IntfShowCB, p_intf );
     var_AddCallback( libvlc, "intf-boss", IntfBossCB, p_intf );
-    var_AddCallback( libvlc, "intf-show", IntfRaiseMainCB, p_intf );
+    /* flix: this one gets the MainCtx itself. A second launch now asks the running one
+     * to come forward (modules/control/win_msg.c), and that can land while this
+     * constructor is still running, before p_intf->p_mi is set */
+    var_AddCallback( libvlc, "intf-show", IntfRaiseMainCB, this );
     var_AddCallback( libvlc, "flix-sub-offer", SubtitleOfferCB, p_intf );
     var_AddCallback( libvlc, "flix-meta-update", MetaUpdateCB, p_intf );
     var_AddCallback( libvlc, "flix-account-result", AccountResultCB, p_intf );
@@ -296,14 +299,16 @@ MainCtx::MainCtx(qt_intf_t *_p_intf)
     /* Register callback for the intf-popupmenu variable */
     var_AddCallback( libvlc, "intf-popupmenu", PopupMenuCB, p_intf );
 
+    /* flix: VLC's own first-run wizard is replaced by the VLCFlix welcome
+     * (FlixWelcome.qml, shown by MainDisplay.qml). The wizard also added the Videos and
+     * Music folders to the library by itself, while VLCFlix promises that nothing is
+     * scanned until a folder is picked. Mark it as done so it never appears. */
     if( var_InheritBool( p_intf, "qt-privacy-ask") )
     {
-        //postpone dialog call, as composition might not be ready yet
-        QMetaObject::invokeMethod(this, [](){
-            THEDP->firstRunDialog();
-        }, Qt::QueuedConnection);
+        config_PutInt( "qt-privacy-ask", 0 );
+        config_SaveConfigFile( p_intf );
     }
-    else if (m_medialib)
+    if (m_medialib)
     {
         QMetaObject::invokeMethod(m_medialib, &MediaLib::reload, Qt::QueuedConnection);
     }
@@ -403,7 +408,7 @@ MainCtx::~MainCtx()
     /* Unregister callbacks */
     libvlc_int_t* libvlc = vlc_object_instance(p_intf);
     var_DelCallback( libvlc, "intf-boss", IntfBossCB, p_intf );
-    var_DelCallback( libvlc, "intf-show", IntfRaiseMainCB, p_intf );
+    var_DelCallback( libvlc, "intf-show", IntfRaiseMainCB, this );
     var_DelCallback( libvlc, "flix-sub-offer", SubtitleOfferCB, p_intf );
     var_DelCallback( libvlc, "flix-meta-update", MetaUpdateCB, p_intf );
     var_DelCallback( libvlc, "flix-account-result", AccountResultCB, p_intf );
@@ -862,6 +867,7 @@ static QVariantMap metaRecordToMap( const QJsonObject &o, const QString &directo
 QUrl MainCtx::pickFolder(const QString &title) const
 {
     QUrl url = QFileDialog::getExistingDirectoryUrl( nullptr, title, QUrl() );
+    msg_Dbg( p_intf, "library: folder picker returned '%s'", qtu( url.toString() ) );
     if( !url.isValid() || url.isEmpty() )
         return url;
 
@@ -1054,7 +1060,10 @@ void MainCtx::openWebPlayer(const QUrl &url, const QString &title, bool frame, c
         return;
     if( !webPlayerAvailable() )
     {
-        // no WebView2 helper: the default browser does the job
+        // no WebView2 helper: the default browser does the job. Say so - a run tree
+        // without flix\ looks exactly like a web view that stopped working.
+        msg_Warn( p_intf, "flix\\flixweb.exe not found next to vlcflix.exe, "
+                          "opening the web player in the browser" );
         QDesktopServices::openUrl( url );
         return;
     }
@@ -2645,8 +2654,7 @@ static int IntfShowCB( vlc_object_t *, const char *,
 static int IntfRaiseMainCB( vlc_object_t *, const char *,
                             vlc_value_t, vlc_value_t, void *param )
 {
-    qt_intf_t *p_intf = (qt_intf_t *)param;
-    p_intf->p_mi->emitRaise();
+    static_cast<MainCtx *>( param )->emitRaise();
 
     return VLC_SUCCESS;
 }
@@ -2781,10 +2789,26 @@ double MainCtx::dp(const double px) const
     return dp(px, m_intfScaleFactor);
 }
 
+QString MainCtx::logoSuffix(qt_intf_t *intf)
+{
+    if( !var_InheritBool( intf, "qt-icon-change" ) )
+        return {};
+    switch( QDate::currentDate().month() )
+    {
+        case 10: return QStringLiteral("-halloween");
+        case 12: return QStringLiteral("-xmas");
+        default: return {};
+    }
+}
+
 bool MainCtx::useXmasCone() const
 {
-    return (QDate::currentDate().dayOfYear() >= QT_XMAS_JOKE_DAY)
-            && var_InheritBool( p_intf, "qt-icon-change" );
+    return logoSuffix( p_intf ) == QLatin1String("-xmas");
+}
+
+QString MainCtx::logoUrl(int size) const
+{
+    return QStringLiteral("qrc:///logo/vlc%1%2.png").arg(size).arg(logoSuffix(p_intf));
 }
 
 bool WindowStateHolder::holdFullscreen(QWindow *window, Source source, bool hold)

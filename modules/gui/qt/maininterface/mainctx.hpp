@@ -408,6 +408,10 @@ public:
     Q_INVOKABLE double dp(const double px) const;
 
     Q_INVOKABLE bool useXmasCone() const;
+    /* "", "-xmas" (December) or "-halloween" (October), see qt-icon-change */
+    static QString logoSuffix(qt_intf_t *);
+    /* qrc URL of the in-app logo for the current season, size in 16/48/128/256 */
+    Q_INVOKABLE QString logoUrl(int size) const;
 
     ThreadRunner* threadRunner() const;
 
@@ -495,6 +499,10 @@ public:
     Q_INVOKABLE void setFlixPref(const QString &key, const QVariant &value);
     // flix: folder chooser for "Add movie folder"; an empty url when cancelled
     Q_INVOKABLE QUrl pickFolder(const QString &title) const;
+    // flix: open the VLCFlix settings at a section ("accounts", "library"...), or the
+    // first-run welcome, from any page; MainDisplay.qml owns both overlays
+    Q_INVOKABLE void openFlixSettings(const QString &section = {}) { emit flixSettingsRequested(section); }
+    Q_INVOKABLE void openWelcome() { emit welcomeRequested(); }
 
     // Online search (TMDB discover / search). params: type ("movie"|"tv"), query, sort, genres
     // ("28,12"), year_from, year_to, min_rating, page. Returns {ready, items, page, totalPages};
@@ -708,6 +716,8 @@ signals:
     void metaUpdated(const QString &key);
     void updateChanged();
     void accountTestResult(const QString &kind, bool ok, const QString &message);
+    void flixSettingsRequested(const QString &section);
+    void welcomeRequested();
     void fullscreenInterfaceToggled( bool );
     void setInterfaceVisibible(bool );
     void setInterfaceFullScreen( bool );

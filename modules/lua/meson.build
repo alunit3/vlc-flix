@@ -80,7 +80,8 @@ if lua_dep.found() and get_option('lua').allowed()
   luac = find_program('luac', required: true)
 
   lua_modules = files(
-    '../../share/lua/extensions/VLSub.lua',
+    # flix: FlixSubs replaces VLSub (the retired opensubtitles.org XML-RPC API)
+    '../../share/lua/extensions/FlixSubs.lua',
     '../../share/lua/intf/cli.lua',
     '../../share/lua/intf/dummy.lua',
     '../../share/lua/intf/dumpmeta.lua',
@@ -98,6 +99,7 @@ if lua_dep.found() and get_option('lua').allowed()
     '../../share/lua/modules/common.lua',
     '../../share/lua/modules/dkjson.lua',
     '../../share/lua/modules/flix_opensubtitles.lua',
+    '../../share/lua/modules/flix_tmdb.lua',
     '../../share/lua/modules/sandbox.lua',
     '../../share/lua/modules/simplexml.lua',
     '../../share/lua/playlist/anevia_streams.lua',

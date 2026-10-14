@@ -79,11 +79,16 @@ int main (int argc, char *argv[])
         if (setenv ("VLC_PLUGIN_PATH", path, 1))
             abort ();
 
-        const char *vlc_argv[4];
+        const char *vlc_argv[8];
         int vlc_argc = 0;
 
         vlc_argv[vlc_argc++] = "--quiet";
         vlc_argv[vlc_argc++] = "--reset-plugins-cache";
+        /* flix: run while VLCFlix is open, the one-instance check (on by default)
+         * handed this over to the player and exited before writing the cache */
+        vlc_argv[vlc_argc++] = "--no-one-instance";
+        vlc_argv[vlc_argc++] = "--extraintf=";
+        vlc_argv[vlc_argc++] = "--no-media-library";
         vlc_argv[vlc_argc++] = "--"; /* end of options */
         vlc_argv[vlc_argc] = NULL;
 

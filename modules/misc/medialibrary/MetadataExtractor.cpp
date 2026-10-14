@@ -87,12 +87,18 @@ std::string EmbeddedThumbnail::extension() const
 }
 
 MetadataExtractor::MetadataExtractor( vlc_object_t* parent )
-    : m_currentCtx( nullptr )
+    : m_obj( parent )
+    , m_currentCtx( nullptr )
     , m_parser(parent, {
         .types = VLC_PREPARSER_TYPE_PARSE | VLC_PREPARSER_OPTION_SUBITEMS,
         .max_parser_threads = 1,
         .max_thumbnailer_threads = 0,
-        .timeout = VLC_TICK_FROM_SEC(5),
+        /* flix: 5s also had to cover starting vlc-preparser.exe, and opening a large
+         * film on a slow or sleeping disk. Missing it failed the file for good. */
+        .timeout = VLC_TICK_FROM_SEC(30),
+        /* in vlc-preparser.exe, so a file that crashes a demuxer cannot take the
+         * player down. flix: that helper used to quit at once (one-instance mode, see
+         * bin/preparser/main.c) and every file failed; it no longer does. */
 #if !defined(HAVE_VLC_EXTERNAL_PREPARSER)
         .external_process = false,
 #else
@@ -191,7 +197,12 @@ void MetadataExtractor::onParserEnded(vlc_preparser_req *req, int status, void *
             ctx->status = medialibrary::parser::Status::Success;
         }
     } else {
-        ctx->status = medialibrary::parser::Status::Fatal;
+        /* flix: was Fatal, which ends the file's chances on the first failure of any
+         * kind - a timeout, an interrupted request, a preparser process that died.
+         * Requeue tries it again later; the retry count still caps it at three. */
+        msg_Warn( ctx->mde->m_obj, "parsing %s failed (status %d), will retry",
+                  ctx->item.mrl().c_str(), status );
+        ctx->status = medialibrary::parser::Status::Requeue;
     }
     ctx->done = true;
     ctx->mde->m_currentCtx = nullptr;

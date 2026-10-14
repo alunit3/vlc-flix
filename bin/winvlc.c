@@ -36,6 +36,7 @@
 #include <windows.h>
 #include <shellapi.h>
 
+#include <stdio.h>
 #include <fcntl.h>
 #include <io.h>
 #include <shlobj.h>
@@ -81,6 +82,43 @@ static void vlc_kill(void *data)
     HANDLE *semp = data;
 
     ReleaseSemaphore(*semp, 1, NULL);
+}
+
+/* Must be same as in modules/control/win_msg.c */
+#define VLC_IPC_RETIRE (WM_APP + 0x564C)
+
+/* flix: once a quit is asked for, stop being the instance a new launch hands its
+ * files to. That launch then waits for this process to end (src/win32/specific.c)
+ * rather than talking to an instance that is shutting down. */
+static void RetireIpcWindow(void)
+{
+    HWND ipcwindow = NULL;
+    while ((ipcwindow = FindWindowEx(NULL, ipcwindow, NULL,
+                                     L"VLCFlix ipc " TEXT(VERSION))) != NULL)
+    {
+        DWORD pid;
+        if (GetWindowThreadProcessId(ipcwindow, &pid)
+         && pid == GetCurrentProcessId())
+        {
+            PostMessage(ipcwindow, VLC_IPC_RETIRE, 0, 0);
+            break;
+        }
+    }
+}
+
+/* flix: closing VLCFlix sometimes left the process behind, idle, for good: the
+ * window gone, the media library and the one-instance mutex still held, so the next
+ * launch could not start properly. The settings and the library are written out
+ * while libvlc shuts down; what can hang after that is only teardown. Give the whole
+ * shutdown this long, then end the process regardless. */
+#define EXIT_GRACE_MS 8000
+
+static DWORD WINAPI ExitWatchdog(LPVOID data)
+{
+    (void)data;
+    Sleep(EXIT_GRACE_MS);
+    TerminateProcess(GetCurrentProcess(), 0);
+    return 0;
 }
 
 int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
@@ -229,6 +267,11 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
         WaitForSingleObject(sem, INFINITE);
         CloseHandle(sem);
 
+        RetireIpcWindow();
+        HANDLE watchdog = CreateThread(NULL, 0, ExitWatchdog, NULL, 0, NULL);
+        if (watchdog != NULL)
+            CloseHandle(watchdog);
+
         libvlc_release (vlc);
     }
     else
@@ -245,5 +288,15 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
         free (argv[i]);
 
     (void)hInstance; (void)hPrevInstance; (void)lpCmdLine; (void)nCmdShow;
+
+    /* flix: libvlc is fully released here. Returning would run the C runtime and
+     * every DLL's detach code with the threads they may wait on already gone, which
+     * is where a closed VLCFlix was found sitting, idle, never exiting. There is
+     * nothing left to save, so leave right away. */
+    if (vlc != NULL)
+    {
+        fflush(NULL);
+        TerminateProcess(GetCurrentProcess(), 0);
+    }
     return 0;
 }

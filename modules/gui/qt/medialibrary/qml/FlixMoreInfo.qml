@@ -637,7 +637,7 @@ Item {
                     if (root.isWeb)
                         return qsTr("No synopsis available.")
                     if (!MainCtx.metaEnabled())
-                        return qsTr("Add a TMDB access token in Preferences to see the synopsis and artwork.")
+                        return qsTr("<a href=\"flix:accounts\">Connect TMDB</a> in the VLCFlix settings to see the synopsis and artwork.")
                     return Object.keys(tmdb.data).length > 0 ? qsTr("No synopsis available.")
                                                               : qsTr("Looking up the synopsis…")
                 }
@@ -645,6 +645,13 @@ Item {
                 font.pixelSize: VLCStyle.dp(16, VLCStyle.scale)
                 lineHeight: 1.15
                 wrapMode: Text.WordWrap
+                // only the "Connect TMDB" line is markup; a synopsis is shown as it came
+                textFormat: (root.overviewText === "" && !root.isWeb && !MainCtx.metaEnabled())
+                            ? Text.StyledText : Text.PlainText
+                linkColor: "#FFFFFF"
+                onLinkActivated: MainCtx.openFlixSettings("accounts")
+
+                HoverHandler { cursorShape: parent.hoveredLink !== "" ? Qt.PointingHandCursor : Qt.ArrowCursor }
             }
 
             Text {

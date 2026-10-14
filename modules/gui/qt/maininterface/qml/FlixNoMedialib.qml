@@ -61,8 +61,7 @@ FocusScope {
 
             sourceSize: Qt.size(0, VLCStyle.colWidth(1) * _eDPR)
 
-            source: MainCtx.useXmasCone() ? "qrc:///logo/vlc48-xmas.png"
-                                          : "qrc:///misc/cone.svg"
+            source: MainCtx.logoUrl(256)
 
             Connections {
                 target: MainCtx
@@ -141,6 +140,9 @@ FocusScope {
                     noFolderHint.visible = false
                     const folder = MainCtx.pickFolder(qsTr("Choose the folder with your movies and series"))
                     if (folder.toString() !== "") {
+                        // flix: kept for the next start, when FlixHomePage adds it. The
+                        // hint used to promise this with nothing behind it.
+                        MainCtx.setFlixPref("library/pending", folder.toString())
                         noFolderHint.text = qsTr("%1 will be added to the library the next time VLCFlix starts.")
                                        .arg(folder.toString().replace(/%20/g, " "))
                         noFolderHint.visible = true

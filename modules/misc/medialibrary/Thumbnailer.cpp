@@ -39,7 +39,9 @@ Thumbnailer::Thumbnailer( vlc_medialibrary_module_t* ml )
         .types = VLC_PREPARSER_TYPE_THUMBNAIL_TO_FILES,
         .max_parser_threads = 0,
         .max_thumbnailer_threads = 1,
-        .timeout = VLC_TICK_FROM_SEC( 3 ),
+        /* flix: was 3s, which also had to cover starting vlc-preparser.exe and
+         * decoding a frame of a 4K film on a slow disk */
+        .timeout = VLC_TICK_FROM_SEC( 10 ),
 #if !defined(HAVE_VLC_EXTERNAL_PREPARSER)
         .external_process = false,
 #else

@@ -48,11 +48,13 @@ SDFileSystemFactory::SDFileSystemFactory(vlc_object_t *parent,
         .max_parser_threads = 1,
         .max_thumbnailer_threads = 0,
         .timeout = VLC_TICK_FROM_SEC(15),
-#if !defined(HAVE_VLC_EXTERNAL_PREPARSER)
+        /* flix: this preparser only lists directories. In a separate process the 15s
+         * timeout also had to cover starting vlc-preparser.exe, which loads every
+         * plugin when there is no plugins cache, so adding a folder failed or worked
+         * depending on how long that took. Listing a folder needs none of the crash
+         * isolation the external process exists for; parsing the files themselves
+         * still happens out of process (MetadataExtractor). */
         .external_process = false,
-#else
-        .external_process = true,
-#endif
     })
 {
     m_isNetwork = strncasecmp( m_scheme.c_str(), "file://",

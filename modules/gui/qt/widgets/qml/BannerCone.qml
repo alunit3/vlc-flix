@@ -31,9 +31,8 @@ Image {
 
     sourceSize: Qt.size(VLCStyle.icon_normal, VLCStyle.icon_normal)
 
-    mipmap: MainCtx.useXmasCone()
-    source: MainCtx.useXmasCone() ? "qrc:///logo/vlc48-xmas.png" // TODO: new xmas cone for designs?
-                                  : "qrc:///misc/cone.svg"
+    mipmap: true
+    source: MainCtx.logoUrl(128)
 
     focus: false
 }

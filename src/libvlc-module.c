@@ -2153,7 +2153,8 @@ vlc_module_begin ()
      * running one and exit, which is the only way it never reaches the media library lock
      * (see libvlc.c). Without this a second launch quietly becomes a full instance that
      * blocks during startup and leaves every later launch without a media library.
-     * --no-one-instance still overrides it, which is how flix/dev.ps1 keeps its loop. */
+     * --no-one-instance still overrides it; flix/dev.ps1 no longer uses it, since a launch
+     * now waits for a closing instance instead of starting beside it (win32/specific.c). */
     add_bool( "one-instance", true, ONEINSTANCE_TEXT,
               ONEINSTANCE_LONGTEXT )
     add_bool( "started-from-file", false, STARTEDFROMFILE_TEXT,

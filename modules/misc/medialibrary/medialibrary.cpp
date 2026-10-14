@@ -495,10 +495,47 @@ bool MediaLibrary::Init()
         return false;
     }
 
-    m_ml->setDiscoverNetworkEnabled( true );
+    /* flix: a file whose parsing failed three times is never looked at again, and the
+     * folder it is in cannot queue it anew either (its old task is still there). The
+     * parser used to give up on a timeout that a cold vlc-preparser.exe could not meet,
+     * so whole folders of films were left stuck that way and never appeared, however
+     * often the folder was added. This only resets files that never finished. */
+    m_ml->forceParserRetry();
+    /* the thumbnails of those files failed the same way; allow another go */
+    m_ml->enableFailedThumbnailRegeneration();
+
+    /* flix: turning network discovery on starts the smb device lister, and with it
+     * the mDNS, SAP and UPnP service discoveries - UPnP initialisation alone takes a
+     * noticeable while. Init() runs on the first library query, which the interface
+     * makes while it opens, so all of it used to happen before the window existed.
+     * Nothing waits for it, so it gets a thread of its own. */
+    if ( vlc_clone( &m_networkThread, enableNetworkDiscovery, this ) == VLC_SUCCESS )
+        m_networkThreadStarted = true;
+    else
+        m_ml->setDiscoverNetworkEnabled( true );
 
     m_initialized = true;
     return true;
+}
+
+void* MediaLibrary::enableNetworkDiscovery( void* data )
+{
+    vlc_thread_set_name( "vlc-ml-network" );
+    auto self = static_cast<MediaLibrary*>( data );
+    self->m_ml->setDiscoverNetworkEnabled( true );
+    return nullptr;
+}
+
+MediaLibrary::~MediaLibrary()
+{
+    bool join;
+    {
+        vlc::threads::mutex_locker lock( m_mutex );
+        join = m_networkThreadStarted;
+        m_networkThreadStarted = false;
+    }
+    if ( join )
+        vlc_join( m_networkThread, nullptr );
 }
 
 int MediaLibrary::Control( int query, va_list args )
@@ -555,6 +592,9 @@ int MediaLibrary::Control( int query, va_list args )
             {
                 case VLC_ML_ADD_FOLDER:
                     m_ml->discover( mrl );
+                    /* flix: adding a folder again is what anyone does when its films do
+                     * not show up - give files that ran out of parse attempts new ones */
+                    m_ml->forceParserRetry();
                     break;
                 case VLC_ML_REMOVE_FOLDER:
                     m_ml->removeRoot( mrl );
@@ -595,6 +635,7 @@ int MediaLibrary::Control( int query, va_list args )
                 m_ml->reload();
             else
                 m_ml->reload( mrl );
+            m_ml->forceParserRetry();
             break;
         }
         case VLC_ML_PAUSE_BACKGROUND:

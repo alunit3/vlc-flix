@@ -125,6 +125,11 @@ void MLFoldersBaseModel::onMlEvent( void* data , const vlc_ml_event_t* event )
         if (!self->failed( event ))
             emit self->onMLEntryPointModified( QPrivateSignal() );
     }
+    // flix: the folder was accepted but could not be read. The library reports that
+    // only as a discovery failure, which nothing listened to, so the folder simply
+    // never appeared
+    else if ( event->i_type == VLC_ML_EVENT_DISCOVERY_FAILED )
+        self->failed( event );
 }
 
 void MLFoldersBaseModel::updateImpl(vlc_ml_folder_list_t* (*folderListFunc)( vlc_medialibrary_t* p_ml, const vlc_ml_query_params_t* params ))
@@ -177,6 +182,13 @@ bool MLFoldersModel::failed(const vlc_ml_event_t *event) const
         emit operationFailed( Remove, QUrl::fromEncoded( event->entry_point_removed.psz_entry_point ) );
         return true;
     }
+    else if ( event->i_type == VLC_ML_EVENT_DISCOVERY_FAILED )
+    {
+        msg_Warn( m_ctx->getIntf(), "library: could not read folder %s",
+                  event->discovery_failed.psz_entry_point );
+        emit operationFailed( Add, QUrl::fromEncoded( event->discovery_failed.psz_entry_point ) );
+        return true;
+    }
 
     return false;
 }
@@ -210,11 +222,14 @@ void MLFoldersModel::add(const QUrl &mrlIn )
 
     struct Ctx { bool added; };
 
+    msg_Dbg( m_ctx->getIntf(), "library: adding folder %s", qtu( mrl.toString( QUrl::FullyEncoded ) ) );
+
     //UI data is updated on onMlEvent
     m_mediaLib->runOnMLThread<Ctx>(this,
     //ML thread
-    [mrl](vlc_medialibrary_t* ml, Ctx& ctx){
+    [mrl, intf = m_ctx->getIntf()](vlc_medialibrary_t* ml, Ctx& ctx){
         ctx.added = vlc_ml_add_folder( ml, qtu( mrl.toString( QUrl::FullyEncoded ) ) ) == VLC_SUCCESS;
+        msg_Dbg( intf, "library: vlc_ml_add_folder %s", ctx.added ? "succeeded" : "failed" );
     },
     //UI thread
     [this, mrl](quint64, Ctx& ctx){

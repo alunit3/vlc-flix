@@ -305,6 +305,7 @@ typedef struct module_bank
     size_t        size;
     vlc_plugin_t **plugins;
     vlc_plugin_t *cache;
+    bool          dirty; /**< the cache file no longer matches the directory */
 } module_bank_t;
 
 /**
@@ -344,6 +345,9 @@ static int AllocatePluginFile (module_bank_t *bank, const char *abspath,
             plugin->path = path;
             plugin->mtime = st->st_mtime;
             plugin->size = st->st_size;
+            /* a plugin that loads but was not in the cache; one that fails to load
+             * (missing dependency) is not cached either way, so it does not count */
+            bank->dirty = true;
         }
         else free(path);
     }
@@ -353,7 +357,9 @@ static int AllocatePluginFile (module_bank_t *bank, const char *abspath,
 
     vlc_plugin_store(plugin);
 
-    if (bank->mode & CACHE_WRITE_FILE) /* Add entry to to-be-saved cache */
+    /* Add entry to the to-be-saved cache. flix: also when only reading it, so that
+     * a missing or stale cache can be written back (see AllocatePluginPath) */
+    if (bank->mode & (CACHE_WRITE_FILE | CACHE_READ_FILE))
     {
         bank->plugins = xrealloc(bank->plugins,
                                  (bank->size + 1) * sizeof (vlc_plugin_t *));
@@ -542,12 +548,23 @@ static void AllocatePluginPath(libvlc_int_t *obj, const char *path,
 
         bank.cache = plugin->next;
         if (mode & CACHE_SCAN_DIR)
+        {
             vlc_plugin_destroy(plugin);
+            bank.dirty = true; /* the plugin file is gone */
+        }
         else
             vlc_plugin_store(plugin);
     }
 
-    if (mode & CACHE_WRITE_FILE)
+    /* flix: without a plugins cache every start loads each of the ~400 plugin DLLs
+     * just to read its description, and so does every vlc-preparser.exe the media
+     * library spawns. Only the installer runs vlc-cache-gen, so the zip, a portable
+     * copy and the dev tree never had one, and a replaced plugin made it stale. Write
+     * it back whenever the scan had to load something. Saving goes through a
+     * temporary file and a rename; where the folder is read-only (Program Files) it
+     * fails with a warning and the installer's cache is used as before. */
+    if ((mode & CACHE_WRITE_FILE)
+     || ((mode & CACHE_READ_FILE) && (mode & CACHE_SCAN_DIR) && bank.dirty))
         CacheSave(obj, path, bank.plugins, bank.size);
 
     free(bank.plugins);

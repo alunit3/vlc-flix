@@ -163,7 +163,7 @@ end
 local function download_and_enable(client, offer)
     local user, password = str("flixsubs-user"), str("flixsubs-password")
     if user == "" or password == "" then
-        notify("Set your OpenSubtitles username and password in Preferences to download subtitles.")
+        notify("Set your OpenSubtitles username and password in VLCFlix settings › Accounts to download subtitles.")
         return
     end
 

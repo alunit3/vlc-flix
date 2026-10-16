@@ -88,7 +88,7 @@ FocusScope {
         Text {
             width: parent.width
             horizontalAlignment: Text.AlignHCenter
-            text: qsTr("Another VLC instance is most likely still running and holding the media database. Close it and start VLCFlix again. An instance that has no window can be ended from Task Manager.")
+            text: qsTr("Another VLCFlix instance is most likely still running and holding the media database. Close it and start VLCFlix again. An instance that has no window can be ended from Task Manager.")
             color: theme.fg.secondary
             font.pixelSize: VLCStyle.dp(13, VLCStyle.scale)
             wrapMode: Text.WordWrap

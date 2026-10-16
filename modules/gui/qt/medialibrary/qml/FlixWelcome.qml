@@ -444,7 +444,7 @@ Item {
                 }
 
                 Body {
-                    text: qsTr("Your own films and series, the way streaming services show them - posters, details, subtitles - played by VLC. Three quick steps get you there; each one can be skipped and changed later in the settings.")
+                    text: qsTr("Your own films and series, the way streaming services show them - posters, details, subtitles - all played by VLCFlix. Three quick steps get you there; each one can be skipped and changed later in the settings.")
                 }
 
                 Item { width: 1; height: VLCStyle.dp(8, VLCStyle.scale) }

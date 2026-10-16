@@ -647,7 +647,7 @@ void VLCProfileEditor::muxSelected()
     if( current->property("module").toString() == "avformat" )
         ui.muxerwarning->setText(
                     QString( "<img src=\":/menu/info.svg\" width=%2 height=%2/> %1" )
-                    .arg( qtr( "This muxer is not provided directly by VLC: It could be missing." ) )
+                    .arg( qtr( "This muxer is not provided directly by VLCFlix: It could be missing." ) )
                     .arg(textsize)
                     );
     else if ( !caps["muxers"].contains( current->property("module").toString() ) &&

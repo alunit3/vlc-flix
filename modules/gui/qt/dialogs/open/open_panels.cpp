@@ -951,7 +951,7 @@ void CaptureOpenPanel::initialize()
     /* Jack Props panel */
 
     /* Pace */
-    jackPace = new QCheckBox(qtr( "Use VLC pace" ));
+    jackPace = new QCheckBox(qtr( "Use VLCFlix pace" ));
     jackPropLayout->addWidget( jackPace, 1, 1 );
 
     /* Auto Connect */

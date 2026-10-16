@@ -482,7 +482,7 @@
                  </sizepolicy>
                 </property>
                 <property name="text">
-                 <string>You just need to fill one of the three following parameters, VLC will autodetect the other using the original aspect ratio</string>
+                 <string>You just need to fill one of the three following parameters, VLCFlix will autodetect the other using the original aspect ratio</string>
                 </property>
                 <property name="wordWrap">
                  <bool>true</bool>

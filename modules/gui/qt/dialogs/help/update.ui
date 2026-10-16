@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>VLC media player updates</string>
+   <string>VLCFlix updates</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
@@ -24,7 +24,7 @@
        <item>
         <widget class="QLabel" name="updateDialogLabel">
          <property name="text">
-          <string>Check for VLC updates</string>
+          <string>Check for VLCFlix updates</string>
          </property>
          <property name="wordWrap">
           <bool>true</bool>

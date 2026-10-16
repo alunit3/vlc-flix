@@ -212,7 +212,7 @@
       <item row="8" column="1" colspan="5">
        <widget class="QLineEdit" name="advancedLineInput">
         <property name="toolTip">
-         <string>Complete MRL for VLC internal</string>
+         <string>Complete MRL for VLCFlix internal</string>
         </property>
        </widget>
       </item>

@@ -72,7 +72,7 @@
            <item>
             <widget class="QPushButton" name="skinImage">
              <property name="toolTip">
-              <string>VLC will use custom skin.</string>
+              <string>VLCFlix will use custom skin.</string>
              </property>
              <property name="text">
               <string/>
@@ -95,7 +95,7 @@
            <item alignment="Qt::AlignHCenter">
             <widget class="QRadioButton" name="skins">
              <property name="toolTip">
-              <string>VLC will use custom skin.</string>
+              <string>VLCFlix will use custom skin.</string>
              </property>
              <property name="text">
               <string>Use custom skin</string>
@@ -109,7 +109,7 @@
            <item>
             <widget class="QPushButton" name="modernImage">
              <property name="toolTip">
-              <string>VLC will use a modern layout with
+              <string>VLCFlix will use a modern layout with
 no menubar or pinned controls but
 with client-side decoration.</string>
              </property>
@@ -134,7 +134,7 @@ with client-side decoration.</string>
            <item alignment="Qt::AlignHCenter">
             <widget class="QRadioButton" name="modernButton">
              <property name="toolTip">
-              <string>VLC will use a modern layout with
+              <string>VLCFlix will use a modern layout with
 no menubar or pinned controls but
 with client-side decoration.</string>
              </property>
@@ -153,7 +153,7 @@ with client-side decoration.</string>
            <item>
             <widget class="QPushButton" name="classicImage">
              <property name="toolTip">
-              <string>VLC will use a classic layout with
+              <string>VLCFlix will use a classic layout with
 a menubar and pinned controls but
 with no client-side decoration.</string>
              </property>
@@ -178,7 +178,7 @@ with no client-side decoration.</string>
            <item alignment="Qt::AlignHCenter">
             <widget class="QRadioButton" name="classicButton">
              <property name="toolTip">
-              <string>VLC will use a classic layout with
+              <string>VLCFlix will use a classic layout with
 a menubar and pinned controls but
 with no client-side decoration.</string>
              </property>

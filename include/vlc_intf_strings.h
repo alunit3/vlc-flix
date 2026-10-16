@@ -73,7 +73,7 @@
 /*************** Video filters **************/
 
 #define I_LONGHELP N_("<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" /></head><body>" \
-    "<h2>Welcome to VLC media player Help</h2>" \
+    "<h2>Welcome to VLCFlix Help</h2><p>VLCFlix is built on VLC media player, so the VLC documentation below applies to it.</p>" \
         "<h3>Documentation</h3>" \
             "<p>You can find VLC documentation on VideoLAN's <a href=\"http://wiki.videolan.org\">wiki</a> website.</p>" \
             "<p>If you are a newcomer to VLC media player, please read the<br><a href=\"http://wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media player</em></a>.</p>" \

@@ -669,7 +669,7 @@ Item {
 
                 Heading { text: qsTr("Accounts") }
                 Note {
-                    text: qsTr("Your keys stay on this PC, in the VLC settings file. They are only sent to TMDB and OpenSubtitles.")
+                    text: qsTr("Your keys stay on this PC, in the VLCFlix settings file. They are only sent to TMDB and OpenSubtitles.")
                 }
 
                 Field {

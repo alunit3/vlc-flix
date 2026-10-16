@@ -339,7 +339,7 @@
     <item row="4" column="0" colspan="3">
      <widget class="QLabel" name="explainerLabel">
       <property name="text">
-       <string>&lt;i&gt;VLC will automatically switch to dark mode accordingly with system settings&lt;/i&gt;</string>
+       <string>&lt;i&gt;VLCFlix will automatically switch to dark mode accordingly with system settings&lt;/i&gt;</string>
       </property>
       <property name="scaledContents">
        <bool>false</bool>
@@ -517,7 +517,7 @@
     <item row="5" column="0" colspan="2">
      <widget class="QLabel" name="layoutExplainer">
       <property name="text">
-       <string>&lt;i&gt;VLC will use a modern layout with no menubar or pinned controls but with client-side decoration&lt;/i&gt;</string>
+       <string>&lt;i&gt;VLCFlix will use a modern layout with no menubar or pinned controls but with client-side decoration&lt;/i&gt;</string>
       </property>
       <property name="alignment">
        <set>Qt::AlignCenter</set>

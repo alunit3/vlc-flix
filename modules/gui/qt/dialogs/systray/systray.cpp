@@ -42,9 +42,9 @@ VLCSystray::VLCSystray(MainCtx* ctx, QObject* parent)
     const QIcon iconVLC( QStringLiteral(":/logo/vlc256%1.png").arg( MainCtx::logoSuffix( m_intf ) ) );
 
     setIcon(iconVLC);
-    setToolTip( qtr( "VLC media player" ));
+    setToolTip( qtr( "VLCFlix" ));
 
-    m_menu = std::make_unique<VLCMenu>( qtr( "VLC media player"), m_intf );
+    m_menu = std::make_unique<VLCMenu>( qtr( "VLCFlix"), m_intf );
     m_menu->setIcon( iconVLC );
     setContextMenu(m_menu.get());
     update();
@@ -114,7 +114,7 @@ void VLCSystray::updateTooltipName( const QString& name )
 {
     if( name.isEmpty() )
     {
-        setToolTip( qtr( "VLC media player" ) );
+        setToolTip( qtr( "VLCFlix" ) );
     }
     else
     {
@@ -124,7 +124,7 @@ void VLCSystray::updateTooltipName( const QString& name )
             ( m_notificationSetting == NOTIFICATION_MINIMIZED && (windowVisiblity == QWindow::Hidden || windowVisiblity == QWindow::Minimized)))
         {
             const auto showMessageTemplate = [this, &name](const auto &icon) {
-                showMessage( qtr( "VLC media player" ), name, icon, 3000 );
+                showMessage( qtr( "VLCFlix" ), name, icon, 3000 );
             };
 
             assert(m_intf);
@@ -171,13 +171,13 @@ void VLCSystray::update()
     if( m_ctx->interfaceVisibility() != QWindow::Hidden )
     {
         m_menu->addAction(
-            QIcon( ":/logo/vlc16.png" ), qtr( "&Hide VLC media player in taskbar" ),
+            QIcon( ":/logo/vlc16.png" ), qtr( "&Hide VLCFlix in taskbar" ),
             this, &VLCSystray::hideUpdateMenu);
     }
     else
     {
         m_menu->addAction(
-            QIcon( ":/logo/vlc16.png" ), qtr( "Sho&w VLC media player" ),
+            QIcon( ":/logo/vlc16.png" ), qtr( "Sho&w VLCFlix" ),
             this, &VLCSystray::showUpdateMenu);
     }
     m_menu->addSeparator();

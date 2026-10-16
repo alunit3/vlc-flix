@@ -983,7 +983,7 @@ cdata.set_quoted('VERSION',         vlc_version)
 cdata.set_quoted('PACKAGE_VERSION', vlc_version)
 # flix: VLCFlix's own version for the user (keep in step with FLIX_VERSION in configure.ac);
 # the project version above stays VLC's, which plugin entry points are named after
-flix_version = '1.0.3'
+flix_version = '1.0.4'
 cdata.set_quoted('FLIX_VERSION', flix_version)
 cdata.set_quoted('VERSION_MESSAGE', f'@flix_version@ (VLC @vlc_version@ @vlc_version_codename@)')
 

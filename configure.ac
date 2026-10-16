@@ -12,10 +12,10 @@ VERSION_DEV=dev
 dnl flix: the version of VLCFlix itself, as the user sees it (About box, installer, user
 dnl agent). AC_INIT above stays VLC's own: plugin entry points, the libvlc ABI and the
 dnl prebuilt contribs are named after it. CI reads this line for the release asset names.
-FLIX_VERSION=1.0.3
+FLIX_VERSION=1.0.4
 FLIX_VERSION_MAJOR=1
 FLIX_VERSION_MINOR=0
-FLIX_VERSION_REVISION=3
+FLIX_VERSION_REVISION=4
 
 VERSION_DATE=$(
     VERSION_PATTERN='^v?([[0-9]]+\.?)+(-[[0-9]]+)?$'

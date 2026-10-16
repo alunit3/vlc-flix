@@ -39,7 +39,7 @@ T.Popup {
     readonly property real _rowHeight: VLCStyle.dp(44, VLCStyle.scale)
     readonly property real _headerHeight: VLCStyle.dp(64, VLCStyle.scale)
     readonly property real _footerHeight: VLCStyle.dp(52, VLCStyle.scale)
-    readonly property int _rows: Math.max(Player.audioTracks.count, Player.subtitleTracks.count + 1, 1)
+    readonly property int _rows: Math.max(Player.audioTracks.count, Player.subtitleTracks.count + 2, 1)
 
     // set by LangButton: the room there is above the seekbar
     property real maxHeight: VLCStyle.dp(480, VLCStyle.scale)
@@ -104,6 +104,14 @@ T.Popup {
                 title: qsTr("Subtitles")
                 tracksModel: Player.subtitleTracks
                 withOff: true
+
+                // our own subtitle search (FlixSubs), at the end of the list
+                actionText: qsTr("Download subtitles online…")
+                actionIcon: VLCIcons.ic_fluent_arrow_download_24_regular
+                onActionTriggered: {
+                    root.close()
+                    Player.openVLsub()
+                }
 
                 Navigation.parentItem: root.contentItem
                 Navigation.leftItem: audioColumn
@@ -215,6 +223,8 @@ T.Popup {
         id: row
 
         property bool selected: false
+        // an action row shows this glyph where tracks show their check
+        property string glyph: ""
 
         implicitHeight: root._rowHeight
         hoverEnabled: true
@@ -245,11 +255,11 @@ T.Popup {
                 anchors.verticalCenter: parent.verticalCenter
                 width: VLCStyle.dp(28, VLCStyle.scale)
 
-                visible: row.selected
-                text: VLCIcons.check
+                visible: row.selected || row.glyph !== ""
+                text: (row.glyph !== "") ? row.glyph : VLCIcons.check
                 font.family: VLCIcons.fontFamily
                 font.pixelSize: VLCStyle.dp(22, VLCStyle.scale)
-                color: "#FFFFFF"
+                color: (row.glyph !== "" && !(row.hovered || row.activeFocus)) ? "#B3B3B3" : "#FFFFFF"
             }
 
             Text {
@@ -273,6 +283,11 @@ T.Popup {
         required property string title
         required property var tracksModel
         property bool withOff: false
+
+        // an optional last row that is an action rather than a track
+        property string actionText: ""
+        property string actionIcon: ""
+        signal actionTriggered()
 
         // how many of the tracks are selected, kept up to date by the rows
         property int _checkedCount: 0
@@ -347,6 +362,8 @@ T.Popup {
                         const r = trackRepeater.itemAt(0)
                         if (r)
                             r.forceActiveFocus(Qt.TabFocusReason)
+                        else if (actionRow.visible)
+                            actionRow.forceActiveFocus(Qt.TabFocusReason)
                     }
 
                     onClicked: {
@@ -393,6 +410,8 @@ T.Popup {
                         Navigation.downAction: function() {
                             if (index < trackRepeater.count - 1)
                                 trackRepeater.itemAt(index + 1).forceActiveFocus(Qt.TabFocusReason)
+                            else if (actionRow.visible)
+                                actionRow.forceActiveFocus(Qt.TabFocusReason)
                             else
                                 column.Navigation.defaultNavigationDown()
                         }
@@ -406,6 +425,35 @@ T.Popup {
 
                         onClicked: model.checked = true
                     }
+                }
+
+                TrackRow {
+                    id: actionRow
+
+                    visible: column.actionText !== ""
+                    width: rows.width
+                    text: column.actionText
+                    glyph: column.actionIcon
+
+                    Accessible.role: Accessible.Button
+                    Accessible.checkable: false
+
+                    Navigation.parentItem: column
+                    Navigation.upAction: function() {
+                        if (trackRepeater.count > 0)
+                            trackRepeater.itemAt(trackRepeater.count - 1).forceActiveFocus(Qt.BacktabFocusReason)
+                        else if (column.withOff)
+                            offRow.forceActiveFocus(Qt.BacktabFocusReason)
+                    }
+
+                    onActiveFocusChanged: {
+                        if (activeFocus)
+                            flick.contentY = Helpers.clamp(flick.contentY,
+                                                           y + height - flick.height,
+                                                           y)
+                    }
+
+                    onClicked: column.actionTriggered()
                 }
             }
         }

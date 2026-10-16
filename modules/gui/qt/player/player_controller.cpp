@@ -146,6 +146,30 @@ void PlayerControllerPrivate::UpdateArt(input_item_t *p_item)
     emit q->artChanged( m_artUrl );
 }
 
+/* flix: safety net for a picture that stays frozen after a resume while the sound plays
+ * on (the decoder keeps decoding, the video output drops every frame as late). A seek to
+ * the current time, which is what clicking the seekbar did, puts it right again. The
+ * clock cause is fixed in the audio output; this only catches whatever is left. */
+void PlayerControllerPrivate::checkResumeStall( unsigned watch, int64_t displayed, int64_t decoded )
+{
+    if ( watch != m_resumeWatch || m_playing_status != PlayerController::PLAYING_STATE_PLAYING
+         || !m_hasVideo )
+        return;
+    const int64_t nowDisplayed = m_stats.i_displayed_pictures;
+    const int64_t nowDecoded = m_stats.i_decoded_video;
+    if ( nowDisplayed != displayed || nowDecoded < decoded + 10 )
+        return;
+
+    vlc_player_locker lock{ m_player };
+    if ( !isCurrentItemSynced() )
+        return;
+    const vlc_tick_t now = vlc_player_GetTime( m_player );
+    if ( now == VLC_TICK_INVALID )
+        return;
+    msg_Warn( p_intf, "flix: video stalled after resume, seeking to the current time" );
+    vlc_player_SetTime( m_player, now );
+}
+
 void PlayerControllerPrivate::UpdateStats( const input_stats_t& stats )
 {
     Q_Q(PlayerController);
@@ -395,7 +419,9 @@ static void on_player_state_changed(vlc_player_t *, enum vlc_player_state state,
 
     that->callAsync([that,state] () {
         PlayerController* q = that->q_func();
+        const bool wasPaused = that->m_playing_status == PlayerController::PLAYING_STATE_PAUSED;
         that->m_playing_status = static_cast<PlayerController::PlayingState>(state);
+        ++that->m_resumeWatch; // any state change cancels a pending resume check
         switch ( state ) {
         case VLC_PLAYER_STATE_STARTED:
             msg_Dbg( that->p_intf, "on_player_state_changed VLC_PLAYER_STATE_STARTED");
@@ -407,6 +433,15 @@ static void on_player_state_changed(vlc_player_t *, enum vlc_player_state state,
             that->m_audioStereoMode.resetObject( aout.get() );
             that->m_audioMixMode.resetObject( aout.get() );
             that->m_audioVisualization.resetObject( aout.get() );
+            if ( wasPaused && that->m_hasVideo )
+            {
+                const unsigned watch = that->m_resumeWatch;
+                const int64_t displayed = that->m_stats.i_displayed_pictures;
+                const int64_t decoded = that->m_stats.i_decoded_video;
+                QTimer::singleShot( 2500, q, [that, watch, displayed, decoded] () {
+                    that->checkResumeStall( watch, displayed, decoded );
+                });
+            }
             break;
         }
         case VLC_PLAYER_STATE_PAUSED:

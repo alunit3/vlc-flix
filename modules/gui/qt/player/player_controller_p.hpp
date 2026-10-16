@@ -196,6 +196,10 @@ public:
     QString         m_artUrl;
     struct input_stats_t m_stats;
 
+    // flix: resume watchdog, see checkResumeStall()
+    unsigned        m_resumeWatch = 0;
+    void checkResumeStall( unsigned watch, int64_t displayed, int64_t decoded );
+
     RendererManager m_rendererManager;
 
     // meta

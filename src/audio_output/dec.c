@@ -947,9 +947,19 @@ void vlc_aout_stream_ChangePause(vlc_aout_stream *stream, bool paused, vlc_tick_
             /* Delay the last timing with the pause duration. This will be used
              * by stream_GetDelay() until the module updates its next point
              * after being resumed. */
+            const vlc_tick_t pause_delay = date - stream->timing.pause_date;
             vlc_mutex_lock(&stream->timing.lock);
             if (stream->timing.system_ts != VLC_TICK_INVALID)
-                stream->timing.system_ts += date - stream->timing.pause_date;
+                stream->timing.system_ts += pause_delay;
+            /* flix: shift the rate point by the pause duration too, and do it
+             * before aout->pause(): a module that reports its timing as soon
+             * as it is resumed (wasapi does, from StartNow) would otherwise
+             * compute its audio ts from the pre-pause rate point, jumping it
+             * forward by pause_duration * rate. The master clock resets on
+             * that jump and every video frame is then dropped as late: the
+             * picture freezes while the sound plays on, until a seek. */
+            if (stream->timing.rate_audio_ts != VLC_TICK_INVALID)
+                stream->timing.rate_system_ts += pause_delay;
             vlc_mutex_unlock(&stream->timing.lock);
             stream->timing.pause_date = VLC_TICK_INVALID;
         }
@@ -958,18 +968,6 @@ void vlc_aout_stream_ChangePause(vlc_aout_stream *stream, bool paused, vlc_tick_
             aout->pause(aout, paused, date);
         else if (paused)
             vlc_aout_stream_Flush(stream);
-
-        /* Update the rate point after the pause */
-        if (!paused && stream->timing.rate_audio_ts != VLC_TICK_INVALID)
-        {
-            vlc_clock_Lock(stream->sync.clock);
-            vlc_tick_t play_date =
-                vlc_clock_ConvertToSystem(stream->sync.clock, date,
-                                          stream->timing.rate_audio_ts,
-                                          stream->sync.rate, NULL);
-            vlc_clock_Unlock(stream->sync.clock);
-            stream->timing.rate_system_ts = play_date;
-        }
     }
 }
 

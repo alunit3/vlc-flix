@@ -29,52 +29,114 @@ import VLC.Util
 PopupIconToolButton {
     id: root
 
-    popup.width: VLCStyle.dp(256, VLCStyle.scale)
+    // flix: a speedometer icon that opens the Netflix-style speed picker
+    popup.width: popup.contentItem.implicitWidth + popup.leftPadding + popup.rightPadding
+    popup.padding: 0
+    popup.x: Math.min((root.width - popup.width) / 2,
+                      root.width + VLCStyle.margin_large - popup.width)
+    // above the seekbar, which runs just over the buttons
+    popup.y: -popup.height - VLCStyle.dp(44, VLCStyle.scale)
+
+    popup.background: Rectangle {
+        color: "#262626"
+        radius: VLCStyle.dp(4, VLCStyle.scale)
+        border.color: Qt.rgba(1, 1, 1, 0.08)
+        border.width: 1
+    }
 
     text: qsTr("Playback Speed")
 
-    description: qsTr("change playback speed")
+    description: qsTr("Playback speed (%1x)").arg(+Player.rate.toFixed(2))
 
     AccessibleCompat.id: "playbackSpeedButton"
 
-    popup.contentItem: PlaybackSpeed {
-        colorContext.palette: root.colorContext.palette
-
-        Navigation.parentItem: root
-
-        // NOTE: Mapping the right direction because the down action triggers the ComboBox.
-        Navigation.rightItem: root
-
-        onRadioButtonClicked: {
-            root.popup.close()
-        }
+    popup.contentItem: FlixSpeedPicker {
+        focus: true
+        onPicked: root.popup.close()
     }
 
     contentItem: Item {
-        implicitHeight: label.implicitHeight
-        implicitWidth: textMetrics.width
+        implicitHeight: root.font.pixelSize
+        implicitWidth: gauge.width + (rateLabel.visible ? rateLabel.implicitWidth + VLCStyle.margin_xxsmall : 0)
 
-        TextMetrics {
-            id: textMetrics
-            font: label.font
-            // '-' is for additional space if certain digits have more width with certain fonts
-            text: "0.00x-"
+        // the gauge: a ring with a needle and a hub, drawn so it takes the button colour
+        // (Canvas and Shapes are not part of this Qt build)
+        Item {
+            id: gauge
+
+            readonly property real s: root.font.pixelSize
+            readonly property real stroke: Math.max(2, Math.round(s * 0.09))
+
+            width: s
+            height: s
+            anchors.verticalCenter: parent.verticalCenter
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: gauge.s * 0.84
+                height: width
+                radius: width / 2
+                color: "transparent"
+                border.color: root.color
+                border.width: gauge.stroke
+            }
+
+            // ticks at the top and the sides, like a speedometer dial
+            Repeater {
+                model: [-90, -45, 0, 45, 90]
+                Rectangle {
+                    required property var modelData
+                    width: gauge.stroke
+                    height: gauge.s * 0.12
+                    radius: width / 2
+                    color: root.color
+                    x: (gauge.width - width) / 2
+                    y: gauge.s * 0.16
+                    transform: Rotation {
+                        origin.x: gauge.stroke / 2
+                        origin.y: gauge.s / 2 - gauge.s * 0.16
+                        angle: modelData
+                    }
+                }
+            }
+
+            // the needle, pointing to the upper right
+            Rectangle {
+                width: gauge.stroke
+                height: gauge.s * 0.30
+                radius: width / 2
+                color: root.color
+                x: (gauge.width - width) / 2
+                y: gauge.s / 2 - height
+                transform: Rotation {
+                    origin.x: gauge.stroke / 2
+                    origin.y: gauge.s * 0.30
+                    angle: 50
+                }
+            }
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: gauge.stroke * 2.2
+                height: width
+                radius: width / 2
+                color: root.color
+            }
         }
 
+        // the speed, next to the gauge, when it is not the normal one
         Text {
-            id: label
+            id: rateLabel
 
-            anchors.fill: parent
+            anchors.left: gauge.right
+            anchors.leftMargin: VLCStyle.margin_xxsmall
+            anchors.verticalCenter: parent.verticalCenter
 
-            verticalAlignment: Text.AlignVCenter
-            horizontalAlignment: Text.AlignHCenter
-
-            font.pixelSize: VLCStyle.fontSize_normal
-
-            text: !root.paintOnly ? qsTr("%1x").arg(+Player.rate.toFixed(2))
-                                  : qsTr("1x")
-
+            visible: !root.paintOnly && Math.abs(Player.rate - 1) > 0.001
+            text: qsTr("%1x").arg(+Player.rate.toFixed(2))
             color: root.color
+            font.pixelSize: VLCStyle.fontSize_normal
+            font.weight: Font.DemiBold
         }
     }
 
@@ -87,15 +149,17 @@ PopupIconToolButton {
         WheelToVLCConverter {
             id: wheelToVLC
 
+            // one wheel step moves one stop on the speed picker
             function handle(steps: int) {
-                let func
-                if (steps > 0)
-                    func = root.popup.contentItem.slider.increase
-                else
-                    func = root.popup.contentItem.slider.decrease
-
-                for (let i = 0; i < Math.abs(steps); ++i)
-                    func()
+                const speeds = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 3.0, 4.0]
+                let i = 0
+                while (i < speeds.length - 1 && speeds[i] < Player.rate - 0.001)
+                    ++i
+                if (steps > 0 && Math.abs(speeds[i] - Player.rate) < 0.001)
+                    ++i
+                else if (steps < 0)
+                    --i
+                Player.rate = speeds[Math.max(0, Math.min(speeds.length - 1, i))]
             }
 
             Component.onCompleted: {
@@ -110,28 +174,7 @@ PopupIconToolButton {
             acceptedDevices: PointerDevice.AllDevices
 
             onWheel: (wheel) => {
-                if (!root.popup.contentItem || !root.popup.contentItem.slider) {
-                    event.accepted = false
-                    return
-                }
-
-                // NOTE: Uncomment below to support (not only handle) high precision adjustment:
-                // if ((Math.abs(wheel.pixelDelta.x) % 120 > 0) || (Math.abs(wheel.pixelDelta.y) % 120 > 0)) {
-                //     let delta = 0
-                //     if (Math.abs(wheel.pixelDelta.x) > Math.abs(wheel.pixelDelta.y))
-                //         delta = wheel.pixelDelta.x
-                //     else
-                //         delta = wheel.pixelDelta.y
-
-                //     if (wheel.inverted)
-                //         delta = -delta
-
-                //     root.popup.contentItem.slider.value += 0.01 * delta
-                // } else
-                {
-                    wheelToVLC.qmlWheelEvent(wheel)
-                }
-
+                wheelToVLC.qmlWheelEvent(wheel)
                 wheel.accepted = true
             }
         }
@@ -139,12 +182,11 @@ PopupIconToolButton {
         TapHandler {
             acceptedButtons: Qt.RightButton
 
-            enabled: root.popup.contentItem && root.popup.contentItem.slider
-
             gesturePolicy: TapHandler.ReleaseWithinBounds
 
+            // right click: back to normal speed
             onTapped: (eventPoint, button) => {
-                root.popup.contentItem.slider.value = 0
+                Player.rate = 1.0
             }
         }
     }

@@ -276,8 +276,7 @@ T.Pane {
 
             children: {
                 switch (textPosition) {
-                case ControlBar.TimeTextPosition.AboveSlider:
-                    return [mediaRemainingTime]   // flix: only the remaining time, on the right
+                case ControlBar.TimeTextPosition.AboveSlider:   // flix: next to the slider, see row2
                 case ControlBar.TimeTextPosition.Hide:
                 case ControlBar.TimeTextPosition.LeftRightSlider:
                 default:
@@ -292,8 +291,11 @@ T.Pane {
             children: {
                 switch (textPosition) {
                 case ControlBar.TimeTextPosition.Hide:
-                case ControlBar.TimeTextPosition.AboveSlider:
                     return [trackPositionSlider]
+                case ControlBar.TimeTextPosition.AboveSlider:
+                    // flix: as on Netflix, the remaining time sits right of the slider
+                    return root.showRemainingTime ? [trackPositionSlider, mediaRemainingTime]
+                                                  : [trackPositionSlider]
                 case ControlBar.TimeTextPosition.LeftRightSlider:
                     return [mediaTime, trackPositionSlider, mediaRemainingTime]
                 default:
@@ -303,12 +305,14 @@ T.Pane {
 
             visible: children.length > 0
 
-            spacing: VLCStyle.margin_xsmall
+            spacing: (textPosition === ControlBar.TimeTextPosition.AboveSlider) ? VLCStyle.margin_normal
+                                                                                : VLCStyle.margin_xsmall
 
             Layout.fillWidth: true
             Layout.fillHeight: false
+            // flix: the slider lines up with the buttons below it
             Layout.leftMargin: (textPosition === ControlBar.TimeTextPosition.LeftRightSlider) ? VLCStyle.margin_xsmall
-                                                                                              : 0
+                                                                                              : VLCStyle.margin_large
 
             Layout.rightMargin: Layout.leftMargin
         }

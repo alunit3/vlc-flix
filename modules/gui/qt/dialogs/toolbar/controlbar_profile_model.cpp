@@ -36,6 +36,11 @@ constexpr QChar SETTINGS_CONTROL_SEPARATOR {','};
 constexpr QChar SETTINGS_CONFIGURATION_SEPARATOR {'|'};
 constexpr QChar SETTINGS_PROFILE_SEPARATOR {'$'};
 
+// flix: bumped whenever the default layout changes, so that the saved profiles of an
+// earlier VLCFlix are replaced by the new defaults once
+constexpr QLatin1String SETTINGS_KEY_FLIXLAYOUT {"FlixLayout"};
+constexpr int FLIX_LAYOUT_VERSION = 2;
+
 decltype (ControlbarProfileModel::m_defaults)
     ControlbarProfileModel::m_defaults =
         {
@@ -112,10 +117,10 @@ decltype (ControlbarProfileModel::m_defaults)
                                 // centre: empty, the title is drawn in the exact middle
                                 // of the bar by PlayerControlLayout.qml
                                 {},
-                                // right: next, episodes, subtitles, speed, fullscreen
+                                // right: next (hidden when nothing follows), subtitles,
+                                // speed, fullscreen
                                 {
                                     ControlListModel::NEXT_BUTTON,
-                                    ControlListModel::PLAYLIST_BUTTON,
                                     ControlListModel::LANG_BUTTON,
                                     ControlListModel::PLAYBACK_SPEED_BUTTON,
                                     ControlListModel::FULLSCREEN_BUTTON
@@ -701,6 +706,7 @@ void ControlbarProfileModel::save(bool clearDirty) const
     m_settings->beginGroup(groupName);
     m_settings->remove(""); // clear the group before save
 
+    m_settings->setValue(SETTINGS_KEY_FLIXLAYOUT, FLIX_LAYOUT_VERSION);
     m_settings->setValue(SETTINGS_KEY_SELECTEDPROFILE, selectedProfile());
 
     m_settings->beginWriteArray(SETTINGS_ARRAYNAME_PROFILES);
@@ -755,6 +761,15 @@ bool ControlbarProfileModel::reload()
     const auto groupName = metaObject()->className();
 
     m_settings->beginGroup(groupName);
+
+    if (m_settings->value(SETTINGS_KEY_FLIXLAYOUT).toInt() < FLIX_LAYOUT_VERSION)
+    {
+        m_settings->remove(SETTINGS_ARRAYNAME_PROFILES);
+        m_settings->remove(SETTINGS_KEY_SELECTEDPROFILE);
+        m_settings->setValue(SETTINGS_KEY_FLIXLAYOUT, FLIX_LAYOUT_VERSION);
+        m_settings->endGroup();
+        return false;
+    }
 
     const int size = m_settings->beginReadArray(SETTINGS_ARRAYNAME_PROFILES);
 

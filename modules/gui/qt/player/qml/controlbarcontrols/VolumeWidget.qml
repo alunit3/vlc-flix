@@ -30,6 +30,8 @@ T.Pane {
 
     property bool paintOnly: false
 
+    property real flixIconSize: 0 // flix: set by ControlRepeater for the video player bar
+
     readonly property color sliderColor: {
         const theme = volControl.colorContext
         return (volControl.position > _fullvolpos) ? theme.fg.negative : theme.fg.primary
@@ -48,6 +50,11 @@ T.Pane {
     contentWidth: volumeWidget.implicitWidth
     contentHeight: volumeWidget.implicitHeight
 
+    // flix: only the speaker is shown; the slider slides out while the pointer is over it,
+    // or while it is being dragged or has the keyboard focus
+    hoverEnabled: true
+    readonly property bool _expanded: paintOnly || hovered || volControl.pressed || volControl.activeFocus
+
     Keys.priority: Keys.AfterItem
     Keys.onPressed: (event) => Navigation.defaultKeyAction(event)
 
@@ -62,6 +69,7 @@ T.Pane {
 
             focus: true
             paintOnly: root.paintOnly
+            font.pixelSize: (root.flixIconSize > 0) ? root.flixIconSize : VLCStyle.icon_toolbar
             text: {
                 if (_player.muted)
                     return VLCIcons.volume_muted
@@ -98,7 +106,16 @@ T.Pane {
             id: volControl
 
             // FIXME: use VLCStyle
-            implicitWidth: VLCStyle.dp(100, VLCStyle.scale)
+            implicitWidth: root._expanded ? VLCStyle.dp(100, VLCStyle.scale) : 0
+            visible: implicitWidth > 0
+            opacity: root._expanded ? (_player.muted ? 0.5 : 1) : 0
+
+            Behavior on implicitWidth {
+                NumberAnimation { duration: VLCStyle.duration_short; easing.type: Easing.OutCubic }
+            }
+            Behavior on opacity {
+                NumberAnimation { duration: VLCStyle.duration_short }
+            }
 
             // WARNING: Directly setting the insets break handle and background positioning.
             Binding on topInset {
@@ -129,7 +146,6 @@ T.Pane {
 
             from: 0
             to: root._maxvolpos
-            opacity: _player.muted ? 0.5 : 1
 
             enabled: !root.paintOnly // disables event handling depending on this
 

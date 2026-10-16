@@ -20,6 +20,7 @@ import QtQuick.Layouts
 import QtQuick.Controls
 
 import VLC.MainInterface
+import VLC.Style
 
 Repeater {
     id: repeater
@@ -28,6 +29,9 @@ Repeater {
 
     property real availableWidth: Number.MAX_VALUE
     property real availableHeight: Number.MAX_VALUE
+
+    // flix: glyph size for the icon buttons, 0 keeps their own
+    property real iconSize: 0
 
     signal requestLockUnlockAutoHide(bool lock)
     signal menuOpened(var menu)
@@ -60,15 +64,20 @@ Repeater {
         Layout.maximumWidth: Layout.fillWidth ? (item ? item.implicitWidth : -1) : -1
 
         Layout.minimumHeight: 0
-        Layout.maximumHeight: Math.min((item && item.implicitHeight <= 0) ? Number.MAX_VALUE : item.implicitHeight, repeater.availableHeight)
+        Layout.maximumHeight: Math.min((!item || item.implicitHeight <= 0) ? Number.MAX_VALUE : item.implicitHeight, repeater.availableHeight)
         Layout.fillHeight: true
 
         Layout.alignment: repeater.alignment
 
+        // flix: a control can ask to take no room at all (NextButton without a next item)
+        readonly property bool _flixHidden: !!loader.item && loader.item.flixHidden === true
+
         Binding on visible {
             delayed: true // this is important
-            when: condition
+            when: condition || loader._flixHidden
             value: {
+                if (loader._flixHidden)
+                    return false
                 if (condition)
                     // flix: 1px tolerance. The last right-aligned item sits exactly on the
                     // limit, and with fractional text widths rounding could hide it.
@@ -107,6 +116,13 @@ Repeater {
                 item.activeFocusOnTab = true
 
             item.visible = Qt.binding(function() { return loader.visible })
+
+            if (repeater.iconSize > 0) {
+                if (item.flixIconSize !== undefined) // composite controls size their own icon
+                    item.flixIconSize = Qt.binding(function() { return repeater.iconSize })
+                else if (item.font !== undefined && item.font.family === VLCIcons.fontFamily)
+                    item.font.pixelSize = Qt.binding(function() { return repeater.iconSize })
+            }
 
             if (item.requestLockUnlockAutoHide)
                 item.requestLockUnlockAutoHide.connect(repeater.requestLockUnlockAutoHide)

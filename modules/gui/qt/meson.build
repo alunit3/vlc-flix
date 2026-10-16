@@ -766,6 +766,8 @@ qml_modules += {
        'player/qml/FlixResumeToast.qml',
        'player/qml/FlixTorrentStats.qml',
        'player/qml/FlixSubOffer.qml',
+       'player/qml/FlixTracksPopover.qml',
+       'player/qml/FlixSpeedPicker.qml',
        'player/qml/Player.qml',
        'player/qml/PlayerControlLayout.qml',
        'player/qml/PlayerPlaylistVisibilityFSM.qml',

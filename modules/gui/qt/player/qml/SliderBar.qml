@@ -706,14 +706,15 @@ T.ProgressBar {
     Rectangle {
         id: sliderHandle
 
-        property int _size: control.barHeight * 3
+        // flix: a round red knob that is always there, as on Netflix; it grows on hover
+        property int _size: Math.max(control.barHeight * 3, VLCStyle.dp(14, VLCStyle.scale))
 
         x: (control.visualPosition * control.availableWidth) - width / 2
         y: (control.barHeight - height) / 2
 
         implicitWidth: sliderHandle._size
         implicitHeight: sliderHandle._size
-        radius: VLCStyle.margin_small
+        radius: width / 2
         color: theme.fg.primary
 
         // We use dynamic mutability group because time interpolation
@@ -763,8 +764,6 @@ T.ProgressBar {
             }
         ]
 
-        state: (hoverHandler.hovered || control.visualFocus)
-               ? ((control._currentChapterHovered || (Player.hasChapters && fsm._state === fsm.fsmHeld)) ? "visibleLarge" : "visible")
-               : "hidden"
+        state: (hoverHandler.hovered || control.visualFocus || dragHandler.active) ? "visibleLarge" : "visible"
     }
 }

@@ -30,7 +30,11 @@ FocusScope {
 
     // Properties
 
-    property real spacing: VLCStyle.margin_normal // spacing between controls
+    // flix: the video player bar has larger, more widely spaced icons, as on Netflix
+    readonly property bool _flixLarge: (identifier === PlayerControlbarModel.Videoplayer)
+
+    property real spacing: _flixLarge ? VLCStyle.dp(26, VLCStyle.scale)
+                                      : VLCStyle.margin_normal // spacing between controls
 
     property real layoutSpacing: VLCStyle.margin_xxlarge // spacing between layouts (left, center, and right)
 
@@ -128,6 +132,7 @@ FocusScope {
 
                 availableWidth: loaderLeftRight.width
                 availableHeight: loaderLeftRight.height
+                iconSize: playerControlLayout._flixLarge ? VLCStyle.icon_flixToolbar : 0
 
                 Component.onCompleted: {
                     requestLockUnlockAutoHide.connect(playerControlLayout.requestLockUnlockAutoHide)
@@ -175,6 +180,7 @@ FocusScope {
 
                 availableWidth: loaderLeftRight.width
                 availableHeight: loaderLeftRight.height
+                iconSize: playerControlLayout._flixLarge ? VLCStyle.icon_flixToolbar : 0
 
                 Component.onCompleted: {
                     requestLockUnlockAutoHide.connect(playerControlLayout.requestLockUnlockAutoHide)

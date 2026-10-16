@@ -59,9 +59,9 @@ Item {
 
             width: root._mainWidth
             text: root.paintOnly ? qsTr("Title") : (root._episode ? root._episode[1] : root._display)
-            color: theme.fg.primary
-            font.pixelSize: VLCStyle.dp(15, VLCStyle.scale)
-            font.weight: Font.Bold
+            color: "#FFFFFF"
+            font.pixelSize: VLCStyle.dp(18, VLCStyle.scale)
+            font.weight: Font.Medium
             elide: Text.ElideRight
         }
 
@@ -70,8 +70,8 @@ Item {
 
             visible: !root.paintOnly && root._episode !== null
             text: root._episode ? ("S" + Number(root._episode[2]) + ":E" + Number(root._episode[3])) : ""
-            color: theme.fg.secondary
-            font.pixelSize: VLCStyle.dp(15, VLCStyle.scale)
+            color: "#B3B3B3"
+            font.pixelSize: VLCStyle.dp(18, VLCStyle.scale)
         }
     }
 }

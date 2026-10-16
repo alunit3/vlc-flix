@@ -28,6 +28,9 @@ Widgets.IconToolButton {
 
     text: VLCIcons.next
     enabled: MainPlaylistController.hasNext
+    // flix: a movie shows no next button at all, only an episode with one after it
+    // (ControlRepeater hides the whole slot, it owns the visible property)
+    readonly property bool flixHidden: !paintOnly && !MainPlaylistController.hasNext
     onClicked: MainPlaylistController.next()
     description: qsTr("Next")
 

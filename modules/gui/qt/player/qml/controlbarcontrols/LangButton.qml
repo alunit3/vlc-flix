@@ -45,17 +45,58 @@ Widgets.IconToolButton {
 
     text: VLCIcons.audiosub
 
-    enabled: menuLoader.status === Loader.Ready
+    enabled: (menuLoader.status === Loader.Ready) && (popoverLoader.status === Loader.Ready)
 
-    description: qsTr("Languages and tracks")
+    description: qsTr("Audio and subtitles")
 
     AccessibleCompat.id: "langButton"
 
     // Events
 
-    onClicked: menuLoader.item.open()
+    // flix: the Netflix-style audio / subtitles popover; its "More options" opens the full
+    // track panel (sync, video tracks, speed) that used to open here
+    onClicked: {
+        const popover = popoverLoader.item
+        if (popover.visible) {
+            popover.close()
+            return
+        }
+        const parentItem = popover.parent
+        const right = root.mapToItem(parentItem, root.width, 0).x + VLCStyle.margin_large
+        popover.x = Helpers.clamp(right - popover.width, VLCStyle.margin_large,
+                                  parentItem.width - popover.width - VLCStyle.margin_large)
+        popover.open()
+    }
 
     // Children
+
+    Loader {
+        id: popoverLoader
+
+        sourceComponent: FlixTracksPopover {
+            id: popover
+
+            parent: root._parentItem
+
+            maxHeight: Math.max(VLCStyle.dp(200, VLCStyle.scale),
+                                parent.positionSliderY - VLCStyle.dp(96, VLCStyle.scale))
+            y: parent.positionSliderY - height - VLCStyle.margin_normal
+            z: 1
+
+            onOpened: {
+                root.requestLockUnlockAutoHide(true)
+                root.menuOpened(popover)
+            }
+
+            onClosed: {
+                root.requestLockUnlockAutoHide(false)
+                root.forceActiveFocus()
+                root.menuOpened(null)
+            }
+
+            onRequestMoreOptions: menuLoader.item.open()
+        }
+    }
 
     Loader {
         id: menuLoader
@@ -89,5 +130,7 @@ Widgets.IconToolButton {
     function forceUnlock() {
         if((menuLoader)&&(menuLoader.item))
             menuLoader.item.close()
+        if (popoverLoader.item)
+            popoverLoader.item.close()
     }
 }

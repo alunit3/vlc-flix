@@ -110,6 +110,7 @@ QtObject {
     readonly property int icon_dragItem: MainCtx.dp(32, scale);
     readonly property int icon_topbar: icon_normal
     readonly property int icon_toolbar: icon_normal
+    readonly property int icon_flixToolbar: MainCtx.dp(34, scale) // flix: video player bar
     readonly property int icon_audioPlayerButton: MainCtx.dp(32, scale)
     readonly property int icon_playlist: icon_normal
     readonly property int icon_track: icon_normal

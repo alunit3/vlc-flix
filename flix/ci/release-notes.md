@@ -10,7 +10,7 @@ Check them against `SHA256SUMS`. The installer is not code-signed yet, so SmartS
 - **Picture frozen after a pause.** After pausing a film played faster or slower than normal (or at normal speed after the speed had been changed once), the picture could stay still while the sound played on, until you clicked the seekbar. The longer the pause, the more likely. It now resumes properly. Should anything still stall, VLCFlix notices and puts it right by itself within a couple of seconds.
 
 ### New
-- **Audio & subtitles picker** in the style of Netflix: "Audio" and "Subtitles" side by side, a check on what is playing, "Off" for no subtitles, and the subtitle size at the bottom. Sync, video tracks and the rest are under "More options".
+- **Audio & subtitles picker** in the style of Netflix: "Audio" and "Subtitles" side by side, a check on what is playing, "Off" for no subtitles, "Download subtitles online…" to search OpenSubtitles from there, and the subtitle size at the bottom. Sync, video tracks and the rest are under "More options".
 - **Playback speed picker**: 0.5x to 2x on one line, opened from the new speedometer button. Right-click the button to go back to normal speed.
 
 ### Changed
